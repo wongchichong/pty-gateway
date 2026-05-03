@@ -331,8 +331,8 @@ export const CHANNEL_DEPENDENCIES: Record<ChannelType, ChannelDependency | null>
     size: "0.3MB",
     description: "Twitch chat IRC client",
   },
-  googlechat: null, // HTTP only
-  msteams: null,    // HTTP only
+  googlechat: null, // HTTP webhook
+  msteams: null,    // HTTP webhook
   feishu: null,     // HTTP only
   qqbot: null,      // HTTP only
   signal: null,     // Requires Java signal-cli

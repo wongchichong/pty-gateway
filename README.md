@@ -1,16 +1,6 @@
 # PTY Gateway
 
-Connect 13+ messaging platforms to PTY service - outbound only, works behind any firewall.
-
-## Quick Start
-
-```bash
-# Interactive registration (recommended)
-pty-gateway --register
-
-# Start gateway
-pty-gateway
-```
+Connect 22+ messaging platforms to PTY service - outbound only, works behind any firewall.
 
 ## Supported Channels
 
@@ -21,14 +11,33 @@ pty-gateway
 | **WhatsApp** | @whiskeysockets/baileys | QR code | 9MB | ✅ Optional |
 | **Slack** | @slack/bolt | Bot token | 11MB | ✅ Optional |
 | **Matrix** | matrix-js-sdk | Access token | 14MB | ✅ Optional |
-| **IRC** | irc-framework | None | 0.5MB | ✅ Optional |
+| **WeChat** | wechaty | QR code | 15MB | ✅ Optional |
 | **LINE** | @line/bot-sdk | Channel token | 16MB | ✅ Optional |
+| **IRC** | irc-framework | None | 0.5MB | ✅ Optional |
 | **Nostr** | nostr-tools | Private key | 0.5MB | ✅ Optional |
 | **Twitch** | tmi.js | OAuth | 0.3MB | ✅ Optional |
+| **Google Chat** | HTTP webhook | Service account | - | ✅ No deps |
+| **MS Teams** | HTTP webhook | App credentials | - | ✅ No deps |
 | **BlueBubbles** | HTTP | API key | - | ✅ No deps |
 | **Mattermost** | HTTP | Bot token | - | ✅ No deps |
 | **Feishu** | HTTP | App credentials | - | ✅ No deps |
 | **QQ Bot** | HTTP | App credentials | - | ✅ No deps |
+| **Nextcloud** | HTTP | User credentials | - | ✅ No deps |
+| **Synology Chat** | HTTP | Token | - | ✅ No deps |
+| **Tlon/Urbit** | HTTP | API key | - | ✅ No deps |
+| **WebChat** | ws | None | - | ✅ Built-in |
+| **Signal** | signal-cli | Phone number | - | ✅ Requires Java |
+| **iMessage** | AppleScript | None | - | ✅ macOS only |
+
+## Quick Start
+
+```bash
+# Interactive registration (recommended)
+pty-gateway --register
+
+# Start gateway
+pty-gateway
+```
 
 ## Install-on-Use Pattern
 
@@ -46,6 +55,9 @@ npm install @slack/bolt
 
 # Add Matrix support (+14MB)
 npm install matrix-js-sdk
+
+# Add WeChat support (+15MB)
+npm install wechaty
 ```
 
 ## Architecture
@@ -77,42 +89,53 @@ npm install matrix-js-sdk
          └─────────────────────────────┘
 ```
 
+## Webhook Server
+
+For platforms that require webhooks (LINE, Google Chat, MS Teams, etc.):
+
+```bash
+# Start gateway with webhook server
+pty-gateway --webhook-port 3002
+```
+
+Webhook endpoints:
+- `POST /webhook/line` - LINE Messaging API
+- `POST /webhook/googlechat` - Google Chat
+- `POST /webhook/msteams` - MS Teams
+- `POST /webhook/synology` - Synology Chat
+- `POST /webhook/nextcloud` - Nextcloud Talk
+
 ## Registration Walkthrough
 
 ### Telegram
 
-```bash
-pty-gateway --register
-```
-
-1. Select `telegram`
-2. Open Telegram, search `@BotFather`
-3. Send `/newbot`
-4. Choose bot name (e.g., "PTY Gateway")
-5. Choose username ending in `bot` (e.g., `my_pty_bot`)
-6. Paste the token BotFather gives you
+1. Open Telegram, search `@BotFather`
+2. Send `/newbot`
+3. Choose bot name and username
+4. Paste the token
 
 ### Discord
 
-1. Select `discord`
-2. Go to https://discord.com/developers/applications
-3. Create New Application
-4. Add Bot, enable "Message Content Intent"
-5. Reset Token to get your bot token
-6. Use OAuth2 > URL Generator to invite bot to your server
+1. Go to https://discord.com/developers/applications
+2. Create New Application → Add Bot
+3. Enable "Message Content Intent"
+4. Copy bot token
 
 ### WhatsApp
 
-1. Select `whatsapp`
-2. Install: `npm install @whiskeysockets/baileys`
-3. Scan QR code with WhatsApp on your phone
+1. Install: `npm install @whiskeysockets/baileys`
+2. Scan QR code with WhatsApp on your phone
+
+### WeChat
+
+1. Install: `npm install wechaty wechaty-puppet-wechat4u`
+2. Scan QR code with WeChat
 
 ### Slack
 
-1. Select `slack`
-2. Create Slack App at https://api.slack.com/apps
-3. Get Bot User OAuth Token (`xoxb-...`)
-4. Get App-Level Token (`xapp-...`) for Socket Mode
+1. Create Slack App at https://api.slack.com/apps
+2. Get Bot User OAuth Token (`xoxb-...`)
+3. Get App-Level Token (`xapp-...`) for Socket Mode
 
 ## Commands
 
@@ -127,35 +150,6 @@ Available on all channels:
 | `/snapshot` | Get buffer |
 | `/help` | Show help |
 
-### Examples
-
-```
-/start vim file.txt      # Start vim
-/start htop              # Start htop
-/connect                 # List available instances
-/connect abc123          # Connect to specific instance
-/snapshot                # Get current buffer
-/kill                    # Kill instance
-```
-
-## Configuration
-
-Config stored in `~/.pty-gateway/config.json`:
-
-```json
-{
-  "telegram": {
-    "botToken": "123456:ABC..."
-  },
-  "discord": {
-    "botToken": "MTk..."
-  },
-  "whatsapp": {
-    "sessionPath": "~/.pty-gateway/whatsapp-session"
-  }
-}
-```
-
 ## CLI Options
 
 ```bash
@@ -164,27 +158,25 @@ pty-gateway [options]
 Options:
   -r, --register             Interactive channel registration
   -p, --pty <url>            PTY service URL (default: http://localhost:3000)
-  -t, --token <token>        PTY auth token
+  --webhook-port <port>      Webhook server port (default: 3002)
 
-Telegram:
+Channel options:
   --telegram-token <token>   Telegram bot token
-  --telegram-users <ids>     Allowed user IDs
-
-Discord:
   --discord-token <token>    Discord bot token
-  --discord-guild <id>       Restrict to guild
-
-WhatsApp:
-  --whatsapp-session <path>  Session directory
-
-Slack:
-  --slack-bot-token <token>  Bot token (xoxb-...)
-  --slack-app-token <token>  App token (xapp-...)
-
-Matrix:
-  --matrix-homeserver <url>  Homeserver URL
-  --matrix-access-token <t>  Access token
-  --matrix-user-id <id>      User ID (@bot:matrix.org)
+  --whatsapp-session <path>  WhatsApp session directory
+  --slack-bot-token <token>  Slack bot token (xoxb-...)
+  --slack-app-token <token>  Slack app token (xapp-...)
+  --matrix-homeserver <url>  Matrix homeserver URL
+  --matrix-access-token <t>  Matrix access token
+  --matrix-user-id <id>      Matrix user ID (@bot:matrix.org)
+  --irc-server <server>      IRC server
+  --irc-nick <nick>          IRC nickname
+  --line-token <token>       LINE channel access token
+  --line-secret <secret>     LINE channel secret
+  --nostr-key <key>          Nostr private key
+  --twitch-token <token>     Twitch OAuth token
+  --twitch-channels <list>   Twitch channels to join
+  --wechat-puppet <name>     WeChat puppet type
 
 Environment Variables:
   PTY_URL                    PTY service URL
@@ -219,9 +211,6 @@ pnpm build
 # Run tests
 pnpm test
 
-# Run with coverage
-pnpm test:coverage
-
 # Development mode
 pnpm dev
 ```
@@ -233,6 +222,7 @@ src/
 ├── index.ts           # CLI entry point
 ├── pty-client.ts      # HTTP/WS client to PTY service
 ├── router.ts          # Message routing logic
+├── webhook.ts         # Webhook server for LINE/Google Chat/MS Teams
 ├── utils/
 │   └── deps.ts        # Dynamic dependency loader
 └── channels/
@@ -246,6 +236,14 @@ src/
     ├── line.ts        # LINE (@line/bot-sdk)
     ├── nostr.ts       # Nostr (nostr-tools)
     ├── twitch.ts      # Twitch (tmi.js)
+    ├── wechat.ts      # WeChat (wechaty)
+    ├── googlechat.ts  # Google Chat (HTTP)
+    ├── msteams.ts     # MS Teams (HTTP)
+    ├── nextcloud.ts   # Nextcloud Talk (HTTP)
+    ├── synology.ts    # Synology Chat (HTTP)
+    ├── tlon.ts        # Tlon/Urbit (HTTP)
+    ├── webchat.ts     # WebChat (ws)
+    ├── signal.ts      # Signal (signal-cli)
     ├── http.ts        # Generic HTTP channel
     └── index.ts       # Exports & factory
 ```
@@ -269,7 +267,7 @@ export class MyChannel implements Channel {
 
 2. Add to `src/channels/index.ts`
 
-3. Add dependency to `package.json` peerDependencies
+3. Add dependency to `package.json` peerDependencies (if needed)
 
 ## License
 
