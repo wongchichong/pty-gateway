@@ -12,6 +12,79 @@ import { homedir } from "os";
 import AnsiToHtml from "ansi-to-html";
 import { checkRateLimit, getRateLimitMessage } from "./rate-limiter.js";
 
+// ── Command Whitelist ───────────────────────────────────────────────────
+
+// Default safe commands
+const DEFAULT_SAFE_COMMANDS = [
+  // File system navigation
+  "ls", "pwd", "cd", "find", "tree", "dir",
+
+  // File viewing
+  "cat", "less", "more", "head", "tail", "grep", "wc",
+
+  // Text processing
+  "echo", "printf", "sed", "awk", "sort", "uniq", "cut",
+
+  // System info
+  "whoami", "hostname", "date", "uptime", "uname", "df", "du", "free",
+
+  // Process management (view only)
+  "ps", "top", "htop", "jobs", "pgrep", "pstree",
+
+  // Development tools
+  "vim", "nano", "emacs", "code", "git", "npm", "node", "python", "python3",
+  "pip", "pip3", "cargo", "rustc", "go", "make", "gcc", "clang",
+
+  // Shell utilities
+  "clear", "history", "alias", "type", "which", "env", "printenv",
+  "export", "set", "unset",
+
+  // Network (safe subset)
+  "ping", "curl", "wget", "ssh", "scp", "rsync",
+
+  // Archive tools
+  "tar", "gzip", "gunzip", "zip", "unzip",
+
+  // Misc safe commands
+  "man", "help", "exit", "logout", "true", "false", "yes", "no", "sleep",
+];
+
+// Commands that are NEVER allowed
+const BLOCKED_COMMANDS = [
+  "rm", "rmdir", "sudo", "su", "chmod", "chown", "chroot",
+  "dd", "mkfs", "fdisk", "format",
+  "shutdown", "reboot", "halt", "poweroff",
+  "init", "systemctl", "service",
+  "iptables", "ufw", "firewall-cmd",
+  "crontab", "at", "batch",
+  "useradd", "userdel", "usermod", "passwd",
+];
+
+function validateCommand(command: string, safeCommands: string[]): { valid: boolean; reason?: string } {
+  // Extract the base command (first word)
+  const baseCommand = command.trim().split(/\s+/)[0];
+
+  // Check if command is blocked
+  if (BLOCKED_COMMANDS.includes(baseCommand)) {
+    return { valid: false, reason: `Command '${baseCommand}' is blocked for security reasons` };
+  }
+
+  // Check for piped execution patterns (curl | bash, wget | sh)
+  if (command.includes("|") && (command.includes("bash") || command.includes("sh"))) {
+    return { valid: false, reason: "Piped execution is blocked for security reasons" };
+  }
+
+  // Check if command is in safe list
+  if (!safeCommands.includes(baseCommand)) {
+    return {
+      valid: false,
+      reason: `Command '${baseCommand}' is not in the allowed list. Allowed commands: ${safeCommands.slice(0, 10).join(", ")}...`
+    };
+  }
+
+  return { valid: true };
+}
+
 // ── Session Management ───────────────────────────────────────────────────
 
 interface UserSession {
@@ -203,6 +276,29 @@ export class Router {
 
     // If user has an active session, send input to PTY
     if (session) {
+      // Check if it's a gateway command (starts with /)
+      const isGatewayCommand = text.startsWith("/");
+
+      // Validate PTY commands (not gateway commands)
+      if (!isGatewayCommand) {
+        const safeCommands = process.env.ALLOWED_COMMANDS
+          ? process.env.ALLOWED_COMMANDS.split(",").map(c => c.trim())
+          : DEFAULT_SAFE_COMMANDS;
+
+        const validation = validateCommand(text, safeCommands);
+
+        if (!validation.valid) {
+          const channel = this.channels.get(msg.channel);
+          if (channel) {
+            await channel.sendMessage(msg.chatId, `❌ ${validation.reason}`);
+          }
+          console.log(`[${msg.channel}] ⚠️ Command blocked: ${text}`);
+          return;
+        }
+
+        console.log(`[${msg.channel}] ✅ Command validated: ${text}`);
+      }
+
       console.log(`  📤 Sending to PTY instance: ${session.instanceId}`);
       try {
         await this.pty.send(session.instanceId, msg.text + "\n");
