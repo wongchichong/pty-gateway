@@ -244,8 +244,35 @@ Required:
 Optional:
 - `PTY_URL` - PTY server URL (default: http://localhost:3000)
 - `TELEGRAM_ALLOWED_CHATS` - Comma-separated chat IDs
+- `ALLOWED_COMMANDS` - Comma-separated whitelist of PTY commands (default: safe list)
+- `RATE_LIMIT_TOKENS` - Commands per minute per user (default: 5)
+- `RATE_LIMIT_INTERVAL` - Rate limit interval: "minute" or "second" (default: "minute")
 - `AUTO_RESTART` - Enable auto-restart in monitor (true/false)
 - `LOG_LEVEL` - Logging level (info/debug/error)
+
+## Command Whitelist
+
+By default, only safe commands are allowed:
+
+**File navigation**: ls, pwd, cd, find, tree
+**File viewing**: cat, less, head, tail, grep
+**Text processing**: echo, sed, awk, sort, uniq
+**Development**: vim, nano, git, npm, node, python
+**System info**: ps, top, htop, df, du, free
+**Network (safe)**: ping, curl, wget, ssh, scp
+
+**Blocked commands**:
+- Destructive: rm, sudo, chmod, chown
+- System: shutdown, reboot, systemctl
+- Network: iptables, ufw
+- Piped execution: curl | bash, wget | sh
+
+**Custom whitelist**:
+```bash
+export ALLOWED_COMMANDS="ls,pwd,cat,vim,bash,htop,python"
+```
+
+**Security note**: The whitelist prevents accidental damage but is not a complete security solution. Users with PTY access can still read files and execute allowed programs.
 
 ## Support
 

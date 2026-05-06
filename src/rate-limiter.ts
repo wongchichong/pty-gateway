@@ -21,7 +21,10 @@ const RATE_LIMITS: Record<ChannelType, { tokens: number; interval: "minute" | "s
   webchat: { tokens: 30, interval: "minute" },
   signal: { tokens: 5, interval: "minute" },
   imessage: { tokens: 30, interval: "minute" },
-  http: { tokens: 10, interval: "minute" },
+  bluebubbles: { tokens: 30, interval: "minute" },
+  feishu: { tokens: 10, interval: "minute" },
+  mattermost: { tokens: 10, interval: "minute" },
+  qqbot: { tokens: 10, interval: "minute" },
 };
 
 // Track limiters per user per channel

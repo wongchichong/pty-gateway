@@ -7,6 +7,7 @@ import {
   TelegramConfig,
   DiscordConfig,
 } from "./channels/index.js";
+import type { Channel, ChannelMessage, MessageHandler } from "./channels/types.js";
 import { createInterface } from "readline";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "fs";
 import { join } from "path";
@@ -362,6 +363,7 @@ Environment Variables:
   PTY_URL                    PTY service URL
   TELEGRAM_BOT_TOKEN         Telegram bot token
   DISCORD_BOT_TOKEN          Discord bot token
+  ALLOWED_COMMANDS           Comma-separated whitelist of PTY commands (default: safe list)
 
 Config file: ~/.pty-gateway/config.json
 
@@ -460,8 +462,6 @@ async function chatCommand(pty: PtyClient, args: string[]) {
   });
 
   // Create mock channel
-  const { Channel, ChannelMessage, MessageHandler } = await import("./channels/types.js");
-
   class MockChannel implements Channel {
     readonly type = "telegram" as const;
     private messageHandler?: MessageHandler;
