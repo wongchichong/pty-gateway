@@ -63,13 +63,28 @@ const MAX_MESSAGE_LENGTH = parseInt(process.env.MAX_MESSAGE_LENGTH || "3500", 10
 
 // Commands that are NEVER allowed
 const BLOCKED_COMMANDS = [
+  // Unix/Linux dangerous commands
   "rm", "rmdir", "sudo", "su", "chmod", "chown", "chroot",
-  "dd", "mkfs", "fdisk", "format",
+  "dd", "mkfs", "fdisk",
   "shutdown", "reboot", "halt", "poweroff",
   "init", "systemctl", "service",
   "iptables", "ufw", "firewall-cmd",
   "crontab", "at", "batch",
   "useradd", "userdel", "usermod", "passwd",
+
+  // Windows dangerous commands
+  "del", "erase",        // Delete files (like rm)
+  "format",              // Format disk
+  "shutdown",            // Shutdown system (Windows version)
+  "taskkill",            // Kill processes
+  "tasklist",            // List processes (can be used for reconnaissance)
+  "net", "netsh",        // Network/user management
+  "reg", "regedit",      // Registry editing
+  "bcdedit",             // Boot configuration
+  "diskpart",            // Disk partitioning
+  "cipher",              // Encrypt/decrypt
+  "takeown",             // Take ownership of files
+  "icacls",              // Change permissions (like chmod)
 ];
 
 function validateCommand(command: string, safeCommands: string[]): { valid: boolean; reason?: string } {
