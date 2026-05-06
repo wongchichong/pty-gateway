@@ -146,7 +146,7 @@ export class Router {
           this.instanceIdMap.set(shortId, fullId as string);
           this.reverseIdMap.set(fullId as string, shortId);
           // Update counter to be higher than existing IDs
-          const num = parseInt(shortId, 36);
+          const num = parseInt(shortId, 10);
           if (num > this.idCounter) {
             this.idCounter = num;
           }
@@ -558,8 +558,7 @@ export class Router {
       const sessionKey = this.getSessionKey(msg.channel, msg.chatId);
       this.sessions.delete(sessionKey);
       this.pty.unsubscribe(session.instanceId);
-      this.stopAutoRefresh(sessionKey);
-      this.lastMessages.delete(`${msg.chatId}:${session.instanceId}`);
+      this.stopAutoRefresh(sessionKey, msg.chatId, session.instanceId);
       await channel.sendMessage(msg.chatId, `Killed PTY: ${shortId}`);
     } catch (err) {
       await channel.sendMessage(msg.chatId, `Failed to kill: ${err}`);
@@ -905,12 +904,16 @@ Existing instances keep their original size.`;
     }
   }
 
-  private stopAutoRefresh(sessionKey: string) {
+  private stopAutoRefresh(sessionKey: string, chatId?: string, instanceId?: string) {
     const interval = this.refreshIntervals.get(sessionKey);
     if (interval) {
       clearInterval(interval);
       this.refreshIntervals.delete(sessionKey);
       this.editCounters.delete(sessionKey);
+      // Clean up lastMessages map to prevent memory leaks
+      if (chatId && instanceId) {
+        this.lastMessages.delete(`${chatId}:${instanceId}`);
+      }
       console.log(`  ⏹️  Stopped auto-refresh for session ${sessionKey}`);
     }
   }
@@ -958,8 +961,7 @@ Existing instances keep their original size.`;
             `PTY exited with code ${event.code}`
           );
           this.sessions.delete(key);
-          this.stopAutoRefresh(key);
-          this.lastMessages.delete(`${session.chatId}:${event.instanceId}`);
+          this.stopAutoRefresh(key, session.chatId, event.instanceId);
         } else if (event.type === "output" && event.data) {
           // Send output to the chat
           console.log(`  📊 PTY output (${event.data.length} bytes)`);
