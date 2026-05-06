@@ -4,3 +4,7 @@ dist
 .env
 coverage
 *.tgz
+
+# Environment files with secrets
+config.env
+*.env.local

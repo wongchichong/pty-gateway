@@ -8,8 +8,7 @@ User=root
 WorkingDirectory=/root/projects/pty-gateway
 Environment="NODE_ENV=production"
 Environment="PTY_URL=http://localhost:3000"
-Environment="TELEGRAM_BOT_TOKEN=8520957421:AAGBrVEnuGDeFAfAE1GRyJ_-0rJSTL9FtKU"
-Environment="TELEGRAM_ALLOWED_USERS=255433743"
+EnvironmentFile=/etc/pty-gateway/config.env
 
 # Auto-restart on failure
 Restart=always
