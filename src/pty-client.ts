@@ -114,8 +114,9 @@ export class PtyClient {
     });
   }
 
-  async snapshot(id: string): Promise<PtySnapshot> {
-    return this.fetch<PtySnapshot>(`/app/${id}/snapshot`);
+  async snapshot(id: string, preserveColor: boolean = true): Promise<PtySnapshot> {
+    const colorParam = preserveColor ? "?color=true" : "";
+    return this.fetch<PtySnapshot>(`/app/${id}/snapshot${colorParam}`);
   }
 
   async send(id: string, text: string): Promise<void> {

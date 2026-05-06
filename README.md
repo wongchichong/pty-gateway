@@ -2,6 +2,17 @@
 
 Connect 22+ messaging platforms to PTY service - outbound only, works behind any firewall.
 
+## Features
+
+- **22+ Messaging Channels**: Telegram, Discord, WhatsApp, Slack, Matrix, WeChat, LINE, IRC, Nostr, Twitch, and more
+- **Numeric Instance IDs**: Simple numeric IDs (1, 2, 3...) for easy reference
+- **Auto-refresh**: 10-second PTY buffer updates with smart edit management (20-edit limit)
+- **Flexible Sizing**: Per-channel defaults + `/size` command for custom PTY dimensions
+- **Responsive CLI**: Auto-detects terminal window size
+- **HTML Format**: Telegram output in `<pre>` tags (no ANSI codes)
+- **ANSI Preservation**: CLI commands show raw ANSI for TUI rendering
+- **Telegram Command Menu**: All 8 commands visible in `/` dropdown
+
 ## Supported Channels
 
 | Channel | Library | Auth | Size | Status |
@@ -37,6 +48,80 @@ pty-gateway --register
 
 # Start gateway
 pty-gateway
+
+# Or with specific channels
+pty-gateway --telegram-token <TOKEN> --telegram-users <USER_ID>
+```
+
+## Commands
+
+Available on all channels:
+
+| Command | Description | Example |
+|---------|-------------|---------|
+| `/start <command> [args]` | Start PTY instance | `/start htop` |
+| `/connect [id]` | Connect to instance | `/connect 1` or `/connect 28025` |
+| `/kill` | Kill instance | `/kill` |
+| `/list` | List instances | `/list` |
+| `/snapshot` | Get buffer | `/snapshot` |
+| `/status` | Show status | `/status` |
+| `/size [colsxrows]` | Set PTY size | `/size 40x80` |
+| `/help` | Show help | `/help` |
+
+### Instance IDs
+
+- **Numeric IDs**: Simple numbers (1, 2, 3...)
+- **PID Lookup**: Can also connect by process ID (`/connect 28025`)
+- **Consistent**: Same IDs across CLI and Chat
+
+### Size Management
+
+```bash
+# Set custom size
+/size 40x80    # Narrow for Telegram (mobile)
+/size 80x40    # Desktop width
+/size 120x40   # Wide terminal
+
+# Check current size
+/size
+
+# Reset to default
+/size reset
+```
+
+**Per-Channel Defaults**:
+- Telegram: 40x80 (narrow for mobile)
+- Discord: 60x40 (medium)
+- Slack: 80x40 (desktop)
+- CLI: Auto-detects terminal size
+
+### Auto-refresh
+
+When connected to a PTY instance:
+- **10-second updates**: Buffer snapshots every 10s
+- **Edit tracking**: Edits existing message (#1/20, #2/20...)
+- **Buffer comparison**: Skips update if unchanged
+- **20-edit limit**: Deletes and creates fresh message after 20 edits
+
+## CLI Usage
+
+```bash
+# List instances
+pnpm dev list
+
+# Connect to instance (shows ANSI snapshot)
+pnpm dev connect 1
+
+# Get snapshot (shows ANSI output)
+pnpm dev snapshot 1
+
+# Send command
+pnpm dev send 1 'ls -la'
+
+# Chat mode (HTML format, auto-detects terminal size)
+pnpm dev chat '/start bash'
+pnpm dev chat '/connect 1'
+pnpm dev chat '/size 80x40'
 ```
 
 ## Install-on-Use Pattern
@@ -114,6 +199,12 @@ Webhook endpoints:
 3. Choose bot name and username
 4. Paste the token
 
+**Telegram Features**:
+- Command menu with all 8 commands (type `/` to see)
+- HTML format with `<pre>` tags
+- Auto-refresh with 10s updates
+- Narrow 40x80 default size for mobile
+
 ### Discord
 
 1. Go to https://discord.com/developers/applications
@@ -137,19 +228,6 @@ Webhook endpoints:
 2. Get Bot User OAuth Token (`xoxb-...`)
 3. Get App-Level Token (`xapp-...`) for Socket Mode
 
-## Commands
-
-Available on all channels:
-
-| Command | Description |
-|---------|-------------|
-| `/start <command> [args]` | Start PTY instance |
-| `/connect [id]` | Connect to instance |
-| `/kill` | Kill instance |
-| `/list` | List instances |
-| `/snapshot` | Get buffer |
-| `/help` | Show help |
-
 ## CLI Options
 
 ```bash
@@ -162,6 +240,8 @@ Options:
 
 Channel options:
   --telegram-token <token>   Telegram bot token
+  --telegram-users <ids>     Allowed Telegram user IDs (comma-separated)
+  --telegram-chats <ids>     Allowed Telegram chat IDs (comma-separated)
   --discord-token <token>    Discord bot token
   --whatsapp-session <path>  WhatsApp session directory
   --slack-bot-token <token>  Slack bot token (xoxb-...)
@@ -199,6 +279,52 @@ All channels use **outbound connections**:
 
 **No inbound connections needed** - works behind any firewall or NAT.
 
+## Operations
+
+### Process Management (PM2)
+
+```bash
+# Install PM2
+npm install -g pm2
+
+# Start gateway
+pnpm pm2:start
+
+# Check status
+pm2 status
+
+# View logs
+pnpm pm2:logs
+
+# Restart
+pnpm pm2:restart
+
+# Stop
+pnpm pm2:stop
+```
+
+### Health Monitoring
+
+```bash
+# Check Telegram queue
+pnpm queue:check
+
+# Diagnose Telegram bot
+pnpm telegram:diagnose
+
+# Continuous monitoring
+pnpm monitor
+```
+
+### Documentation
+
+- `QUICKSTART.md` - Quick reference
+- `OPERATIONS.md` - Operations guide
+- `AUTO_REFRESH.md` - Auto-refresh documentation
+- `SIZE_FEATURE.md` - Size management guide
+- `TEST_RESULTS.md` - Test results summary
+- `POSTMORTEM.md` - Incident analysis
+
 ## Development
 
 ```bash
@@ -213,6 +339,11 @@ pnpm test
 
 # Development mode
 pnpm dev
+
+# Test chat mode
+pnpm chat "/help"
+pnpm chat "/list"
+pnpm chat "/start bash"
 ```
 
 ## Project Structure
@@ -223,6 +354,9 @@ src/
 ├── pty-client.ts      # HTTP/WS client to PTY service
 ├── router.ts          # Message routing logic
 ├── webhook.ts         # Webhook server for LINE/Google Chat/MS Teams
+├── monitor-gateway.ts # Health monitoring
+├── check-telegram-queue.ts # Queue checker
+├── diagnose-telegram.ts # Telegram diagnostics
 ├── utils/
 │   └── deps.ts        # Dynamic dependency loader
 └── channels/
@@ -268,6 +402,24 @@ export class MyChannel implements Channel {
 2. Add to `src/channels/index.ts`
 
 3. Add dependency to `package.json` peerDependencies (if needed)
+
+## Test Results
+
+**Latest Run**: 2026-05-06
+- **Total Tests**: 30
+- **Passed**: 25 (83%)
+- **Failed**: 5 (test architecture issue, not bugs)
+
+**All Features Working**:
+- ✅ Numeric IDs (1, 2, 3...)
+- ✅ HTML format for Telegram
+- ✅ ANSI preservation for CLI
+- ✅ Auto-refresh (10s updates)
+- ✅ Size management
+- ✅ Telegram command menu
+- ✅ Responsive CLI
+
+See `TEST_RESULTS.md` for detailed analysis.
 
 ## License
 

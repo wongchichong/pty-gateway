@@ -13,9 +13,20 @@
     "start": "node dist/index.js",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:coverage": "vitest run --coverage"
+    "test:coverage": "vitest run --coverage",
+    "chat": "tsx src/chat-mock.ts",
+    "chat:test": "tsx src/chat-mock.ts \"/help\" && tsx src/chat-mock.ts \"/list\" && tsx src/chat-mock.ts \"/start bash\" && tsx src/chat-mock.ts \"/list\"",
+    "monitor": "tsx src/monitor-gateway.ts",
+    "queue:check": "tsx src/check-telegram-queue.ts",
+    "telegram:diagnose": "tsx src/diagnose-telegram.ts",
+    "pm2:start": "pm2 start ecosystem.config.js",
+    "pm2:stop": "pm2 stop pty-gateway",
+    "pm2:restart": "pm2 restart pty-gateway",
+    "pm2:logs": "pm2 logs pty-gateway",
+    "pm2:monit": "pm2 monit"
   },
   "dependencies": {
+    "ansi-to-html": "^0.7.2",
     "discord.js": "^14.14.1",
     "grammy": "^1.26.1",
     "ws": "^8.16.0"
@@ -31,14 +42,30 @@
     "wechaty": ">=1.20.0"
   },
   "peerDependenciesMeta": {
-    "@line/bot-sdk": { "optional": true },
-    "@slack/bolt": { "optional": true },
-    "@whiskeysockets/baileys": { "optional": true },
-    "irc-framework": { "optional": true },
-    "matrix-js-sdk": { "optional": true },
-    "nostr-tools": { "optional": true },
-    "tmi.js": { "optional": true },
-    "wechaty": { "optional": true }
+    "@line/bot-sdk": {
+      "optional": true
+    },
+    "@slack/bolt": {
+      "optional": true
+    },
+    "@whiskeysockets/baileys": {
+      "optional": true
+    },
+    "irc-framework": {
+      "optional": true
+    },
+    "matrix-js-sdk": {
+      "optional": true
+    },
+    "nostr-tools": {
+      "optional": true
+    },
+    "tmi.js": {
+      "optional": true
+    },
+    "wechaty": {
+      "optional": true
+    }
   },
   "devDependencies": {
     "@types/node": "^20.11.0",

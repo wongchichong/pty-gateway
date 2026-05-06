@@ -65,6 +65,10 @@ export interface Channel {
   sendMessage(chatId: string, text: string, options?: SendMessageOptions): Promise<string>;
   /** Send reply to a specific message */
   sendReply(message: ChannelMessage, text: string): Promise<string>;
+  /** Edit an existing message */
+  editMessage?(chatId: string, messageId: string, text: string, options?: SendMessageOptions): Promise<boolean>;
+  /** Delete a message */
+  deleteMessage?(chatId: string, messageId: string): Promise<boolean>;
   /** Set message handler */
   onMessage(handler: MessageHandler): void;
 }

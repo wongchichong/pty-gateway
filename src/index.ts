@@ -201,12 +201,14 @@ interface CliOptions {
   discordAllowedChannels?: string[];
   discordGlobalCommands?: boolean;
   register?: boolean;
+  command?: "chat" | "snapshot" | "connect" | "list" | "send";
+  commandArgs?: string[];
 }
 
 function parseArgs(): CliOptions {
   const args = process.argv.slice(2);
   const config = loadConfig();
-  
+
   const options: CliOptions = {
     ptyUrl: config.ptyUrl || process.env.PTY_URL || "http://localhost:3000",
     ptyToken: config.ptyToken,
@@ -220,6 +222,23 @@ function parseArgs(): CliOptions {
 
   for (let i = 0; i < args.length; i++) {
     const arg = args[i];
+
+    // Check for subcommands first
+    if (arg === "chat" && !arg.startsWith("-")) {
+      return { ...options, command: "chat", commandArgs: args.slice(i + 1) };
+    }
+    if (arg === "snapshot" && !arg.startsWith("-")) {
+      return { ...options, command: "snapshot", commandArgs: args.slice(i + 1) };
+    }
+    if (arg === "connect" && !arg.startsWith("-")) {
+      return { ...options, command: "connect", commandArgs: args.slice(i + 1) };
+    }
+    if (arg === "list" && !arg.startsWith("-")) {
+      return { ...options, command: "list", commandArgs: args.slice(i + 1) };
+    }
+    if (arg === "send" && !arg.startsWith("-")) {
+      return { ...options, command: "send", commandArgs: args.slice(i + 1) };
+    }
 
     switch (arg) {
       case "--pty":
@@ -293,6 +312,14 @@ function printHelp() {
 PTY Gateway - Connect Telegram/Discord to PTY service
 
 Usage: pty-gateway [options]
+       pty-gateway <command> [args]
+
+Commands:
+  chat [message]        Interactive chat mode (or send single message)
+  send <id> <cmd>       Send command to PTY instance (TUI format)
+  snapshot <instance>   Get PTY snapshot (instance ID or short ID)
+  connect <instance>    Connect to PTY instance
+  list                  List all PTY instances
 
 Options:
   -r, --register             Interactive channel registration
@@ -324,6 +351,18 @@ Examples:
   # Start with saved config
   pty-gateway
 
+  # Interactive chat mode
+  pty-gateway chat
+
+  # Send single command
+  pty-gateway chat "/list"
+
+  # Send command to PTY (TUI format)
+  pty-gateway send 4 'ls -la'
+
+  # Get snapshot
+  pty-gateway snapshot 4
+
   # Start with Telegram only
   pty-gateway --telegram-token "123456:ABC..."
 
@@ -332,6 +371,446 @@ Examples:
     --telegram-token "$TELEGRAM_BOT_TOKEN" \\
     --discord-token "$DISCORD_BOT_TOKEN"
 `);
+}
+
+// ── Command Handlers ───────────────────────────────────────────────────────
+
+async function handleCommand(options: CliOptions) {
+  const pty = new PtyClient({
+    url: options.ptyUrl,
+    token: options.ptyToken,
+  });
+
+  // Check PTY health
+  try {
+    const health = await pty.health();
+    if (health.status !== "ok") {
+      console.error("PTY service unhealthy");
+      process.exit(1);
+    }
+  } catch (err) {
+    console.error(`Failed to connect to PTY service: ${err}`);
+    console.error(`Make sure PTY is running: pty --serve --port 3000`);
+    process.exit(1);
+  }
+
+  switch (options.command) {
+    case "chat":
+      await chatCommand(pty, options.commandArgs || []);
+      break;
+
+    case "snapshot":
+      await snapshotCommand(pty, options.commandArgs || []);
+      break;
+
+    case "connect":
+      await connectCommand(pty, options.commandArgs || []);
+      break;
+
+    case "list":
+      await listCommand(pty);
+      break;
+
+    case "send":
+      await sendCommand(pty, options.commandArgs || []);
+      break;
+
+    default:
+      console.error(`Unknown command: ${options.command}`);
+      printHelp();
+      process.exit(1);
+  }
+}
+
+async function chatCommand(pty: PtyClient, args: string[]) {
+  // Import chat-mock functionality
+  const { Router } = await import("./router.js");
+  const router = new Router(pty);
+
+  // Detect terminal size
+  const terminalCols = process.stdout.columns || 80;
+  const terminalRows = process.stdout.rows || 24;
+  console.log(`📐 Terminal size: ${terminalCols}x${terminalRows}\n`);
+
+  // Set default size for mock channel based on terminal
+  router["channelDefaults"].set("telegram", {
+    cols: Math.min(terminalCols, 120),  // Cap at 120 for readability
+    rows: Math.min(terminalRows, 40),   // Cap at 40
+  });
+
+  // Create mock channel
+  const { Channel, ChannelMessage, MessageHandler } = await import("./channels/types.js");
+
+  class MockChannel implements Channel {
+    readonly type = "telegram" as const;
+    private messageHandler?: MessageHandler;
+    private _connected = false;
+    private chatId = "test-chat-123";
+    private userId = "test-user-456";
+    private messageCounter = 1;
+
+    get connected(): boolean {
+      return this._connected;
+    }
+
+    async start(): Promise<void> {
+      this._connected = true;
+      console.log("✅ Mock channel started\n");
+    }
+
+    async stop(): Promise<void> {
+      this._connected = false;
+    }
+
+    async sendMessage(chatId: string, text: string): Promise<string> {
+      const msgId = (this.messageCounter++).toString();
+      console.log(`\n${"─".repeat(60)}`);
+      console.log(`📤 BOT REPLY (Message ID: ${msgId})`);
+      console.log(`${"─".repeat(60)}`);
+      // Format output like Telegram (MarkdownV2 code blocks)
+      if (text.startsWith("```") && text.endsWith("```")) {
+        console.log(text);
+      } else {
+        console.log(text);
+      }
+      console.log(`${"─".repeat(60)}\n`);
+      return msgId;
+    }
+
+    async sendReply(message: ChannelMessage, text: string): Promise<string> {
+      return this.sendMessage(message.chatId, text);
+    }
+
+    onMessage(handler: MessageHandler): void {
+      this.messageHandler = handler;
+    }
+
+    async receiveMessage(text: string): Promise<void> {
+      if (!this.messageHandler) return;
+
+      const msg: ChannelMessage = {
+        id: (this.messageCounter++).toString(),
+        channel: this.type,
+        userId: this.userId,
+        chatId: this.chatId,
+        text,
+        timestamp: Date.now(),
+      };
+
+      console.log(`\n${"═".repeat(60)}`);
+      console.log(`📨 INCOMING MESSAGE`);
+      console.log(`${"═".repeat(60)}`);
+      console.log(`User ID: ${msg.userId}`);
+      console.log(`Chat ID: ${msg.chatId}`);
+      console.log(`Text: "${msg.text}"`);
+      console.log(`${"═".repeat(60)}\n`);
+
+      await this.messageHandler(msg);
+    }
+  }
+
+  const mockChannel = new MockChannel();
+  router.addChannel(mockChannel);
+  pty.onEvent(router.handlePtyEvent);
+
+  await pty.connect();
+  await router.startAll();
+
+  if (args.length === 0) {
+    // Interactive mode
+    console.log("\n" + "═".repeat(60));
+    console.log("PTY Gateway Chat - Interactive Mode");
+    console.log("═".repeat(60));
+    console.log("\nCommands:");
+    console.log("  /start <cmd>   - Start PTY instance");
+    console.log("  /connect <id>  - Connect to instance");
+    console.log("  /list          - List instances");
+    console.log("  /snapshot      - Get PTY buffer");
+    console.log("  /help          - Show help");
+    console.log("  exit           - Quit");
+    console.log("  <any text>     - Send to PTY");
+    console.log("\n" + "═".repeat(60) + "\n");
+
+    const readline = await import("readline");
+    const rl = readline.createInterface({
+      input: process.stdin,
+      output: process.stdout,
+    });
+
+    const question = (prompt: string): Promise<string> => {
+      return new Promise((resolve) => {
+        rl.question(prompt, resolve);
+      });
+    };
+
+    let running = true;
+    while (running) {
+      const input = await question("👤 You: ");
+
+      if (input.toLowerCase() === "exit" || input.toLowerCase() === "quit") {
+        console.log("\n👋 Exiting...\n");
+        running = false;
+        break;
+      }
+
+      if (input.trim()) {
+        await mockChannel.receiveMessage(input);
+      }
+    }
+
+    await router.stopAll();
+    pty.disconnect();
+    rl.close();
+  } else {
+    // Single message mode
+    const message = args.join(" ");
+    await mockChannel.receiveMessage(message);
+    await new Promise((resolve) => setTimeout(resolve, 500));
+    await router.stopAll();
+    pty.disconnect();
+  }
+
+  process.exit(0);
+}
+
+async function sendCommand(pty: PtyClient, args: string[]) {
+  if (args.length === 0) {
+    console.error("Usage: pty-gateway send <instance-id> <command>");
+    console.error("Example: pty-gateway send 4 'ls -la'");
+    process.exit(1);
+  }
+
+  const inputId = args[0];
+  const command = args.slice(1).join(" ");
+
+  if (!command) {
+    console.error("Error: No command specified");
+    console.error("Usage: pty-gateway send <instance-id> <command>");
+    process.exit(1);
+  }
+
+  try {
+    // Resolve short ID to full ID
+    let instanceId = inputId;
+    const instances = await pty.list();
+
+    // Check if it's a short ID (numeric)
+    if (/^\d+$/.test(inputId)) {
+      const { existsSync, readFileSync } = await import("fs");
+      const { join } = await import("path");
+      const { homedir } = await import("os");
+      const idMapFile = join(homedir(), ".pty-gateway", "instance-ids.json");
+
+      if (existsSync(idMapFile)) {
+        const data = readFileSync(idMapFile, "utf8");
+        const map = JSON.parse(data);
+        if (map[inputId]) {
+          instanceId = map[inputId];
+        }
+      }
+    }
+
+    // If still not found, try partial match
+    if (instanceId === inputId) {
+      const match = instances.find((i) => i.id === inputId || i.id.startsWith(inputId));
+      if (match) {
+        instanceId = match.id;
+      }
+    }
+
+    // Check if instance exists
+    const instance = instances.find((i) => i.id === instanceId);
+
+    if (!instance) {
+      console.error(`Instance not found: ${inputId}`);
+      process.exit(1);
+    }
+
+    // Send command to PTY
+    console.log(`\n📤 Sending to PTY ${instanceId}: "${command}"`);
+    await pty.send(instanceId, command + "\n");
+
+    // Wait for command execution
+    await new Promise((resolve) => setTimeout(resolve, 500));
+
+    // Get snapshot with colors
+    const snapshot = await pty.snapshot(instanceId, true);
+    const content = snapshot.visibleLines.join("\n");
+    // Output ANSI-colored content directly (terminal will render colors)
+    process.stdout.write("\n" + content + "\n\n");
+  } catch (err) {
+    console.error(`Failed to send command: ${err}`);
+    process.exit(1);
+  }
+
+  process.exit(0);
+}
+
+async function snapshotCommand(pty: PtyClient, args: string[]) {
+  if (args.length === 0) {
+    console.error("Usage: pty-gateway snapshot <instance-id>");
+    process.exit(1);
+  }
+
+  const inputId = args[0];
+
+  try {
+    // Try to resolve short ID to full ID
+    let instanceId = inputId;
+    const instances = await pty.list();
+
+    // Check if it's a short ID (numeric)
+    if (/^\d+$/.test(inputId)) {
+      // Load ID map
+      const { existsSync, readFileSync } = await import("fs");
+      const { join } = await import("path");
+      const { homedir } = await import("os");
+      const idMapFile = join(homedir(), ".pty-gateway", "instance-ids.json");
+
+      if (existsSync(idMapFile)) {
+        const data = readFileSync(idMapFile, "utf8");
+        const map = JSON.parse(data);
+        if (map[inputId]) {
+          instanceId = map[inputId];
+        }
+      }
+    }
+
+    // If still not found, try partial match
+    if (instanceId === inputId) {
+      const match = instances.find((i) => i.id === inputId || i.id.startsWith(inputId));
+      if (match) {
+        instanceId = match.id;
+      }
+    }
+
+    // Get snapshot with color support
+    const snapshot = await pty.snapshot(instanceId, true);
+
+    // Output ANSI-colored content directly to terminal (terminal will render colors)
+    const content = snapshot.visibleLines.join("\n");
+    process.stdout.write("\n" + content + "\n\n");
+  } catch (err) {
+    console.error(`Failed to get snapshot: ${err}`);
+    process.exit(1);
+  }
+
+  process.exit(0);
+}
+
+async function connectCommand(pty: PtyClient, args: string[]) {
+  if (args.length === 0) {
+    console.error("Usage: pty-gateway connect <instance-id>");
+    process.exit(1);
+  }
+
+  const inputId = args[0];
+
+  try {
+    // Resolve short ID to full ID
+    let instanceId = inputId;
+    const instances = await pty.list();
+
+    // Check if it's a short ID (numeric)
+    if (/^\d+$/.test(inputId)) {
+      const { existsSync, readFileSync } = await import("fs");
+      const { join } = await import("path");
+      const { homedir } = await import("os");
+      const idMapFile = join(homedir(), ".pty-gateway", "instance-ids.json");
+
+      if (existsSync(idMapFile)) {
+        const data = readFileSync(idMapFile, "utf8");
+        const map = JSON.parse(data);
+        if (map[inputId]) {
+          instanceId = map[inputId];
+        }
+      }
+    }
+
+    // If still not found, try partial match
+    if (instanceId === inputId) {
+      const match = instances.find((i) => i.id === inputId || i.id.startsWith(inputId));
+      if (match) {
+        instanceId = match.id;
+      }
+    }
+
+    // Check if instance exists
+    const instance = instances.find((i) => i.id === instanceId);
+
+    if (!instance) {
+      console.error(`Instance not found: ${inputId}`);
+      console.error("\nAvailable instances:");
+      const list = instances
+        .map((i) => {
+          const shortId = parseInt(i.id.split('-')[0], 16) % 10000;
+          return `  ${shortId}: ${i.name || 'unknown'} (PID ${i.pid})`;
+        })
+        .join("\n");
+      console.error(list);
+      process.exit(1);
+    }
+
+    // Get snapshot with colors
+    const snapshot = await pty.snapshot(instanceId, true);
+    const content = snapshot.visibleLines.join("\n");
+
+    console.log(`\n✅ Connected to PTY: ${instanceId}`);
+    console.log(`Command: ${instance.name}`);
+    console.log(`PID: ${instance.pid}`);
+    // Output ANSI-colored content directly (terminal will render colors)
+    process.stdout.write("\n" + content + "\n\n");
+  } catch (err) {
+    console.error(`Failed to connect: ${err}`);
+    process.exit(1);
+  }
+
+  process.exit(0);
+}
+
+async function listCommand(pty: PtyClient) {
+  try {
+    const instances = await pty.list();
+
+    if (instances.length === 0) {
+      console.log("No active instances.");
+    } else {
+      // Load Router's instance ID map for consistent short IDs
+      const { existsSync, readFileSync } = await import("fs");
+      const { join } = await import("path");
+      const { homedir } = await import("os");
+      const idMapFile = join(homedir(), ".pty-gateway", "instance-ids.json");
+
+      let instanceIdMap: Map<string, string> = new Map();
+      let reverseIdMap: Map<string, string> = new Map();
+
+      if (existsSync(idMapFile)) {
+        const data = readFileSync(idMapFile, "utf8");
+        const map = JSON.parse(data);
+        for (const [shortId, fullId] of Object.entries(map)) {
+          instanceIdMap.set(shortId, fullId as string);
+          reverseIdMap.set(fullId as string, shortId);
+        }
+      }
+
+      // Format like /list command in chat
+      const list = instances
+        .map((i) => {
+          const shortId = reverseIdMap.get(i.id) || "?";
+          return `${shortId}: ${i.name || 'unknown'} (PID ${i.pid}, ${i.cols}x${i.rows})`;
+        })
+        .join("\n");
+
+      console.log("\nPTY instances:");
+      console.log(list);
+      console.log();
+    }
+  } catch (err) {
+    console.error(`Failed to list instances: ${err}`);
+    process.exit(1);
+  }
+
+  process.exit(0);
 }
 
 // ── Main ─────────────────────────────────────────────────────────────────
@@ -343,6 +822,12 @@ async function main() {
   if (options.register) {
     await runRegistration();
     process.exit(0);
+  }
+
+  // Handle subcommands
+  if (options.command) {
+    await handleCommand(options);
+    return;
   }
 
   // Check if at least one channel is configured
