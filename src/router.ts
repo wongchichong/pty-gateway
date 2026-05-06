@@ -49,6 +49,12 @@ const DEFAULT_SAFE_COMMANDS = [
   "man", "help", "exit", "logout", "true", "false", "yes", "no", "sleep",
 ];
 
+// Configuration constants
+const AUTO_SNAPSHOT_DELAY = parseInt(process.env.AUTO_SNAPSHOT_DELAY || "500", 10);
+const AUTO_REFRESH_INTERVAL = parseInt(process.env.AUTO_REFRESH_INTERVAL || "10000", 10);
+const MAX_EDITS = parseInt(process.env.MAX_EDITS || "20", 10);
+const MAX_MESSAGE_LENGTH = parseInt(process.env.MAX_MESSAGE_LENGTH || "3500", 10);
+
 // Commands that are NEVER allowed
 const BLOCKED_COMMANDS = [
   "rm", "rmdir", "sudo", "su", "chmod", "chown", "chroot",
@@ -114,7 +120,7 @@ export class Router {
   private refreshIntervals: Map<string, NodeJS.Timeout> = new Map();
   private lastMessages: Map<string, { id: string; text: string }> = new Map();
   private editCounters: Map<string, number> = new Map(); // Track edit count per session
-  private readonly MAX_EDITS = 20; // Telegram edit limit before delete
+  private readonly MAX_EDITS = MAX_EDITS; // Telegram edit limit before delete
 
   // Default sizes per channel type
   private channelDefaults: Map<ChannelType, ChannelDefaults> = new Map([
@@ -315,7 +321,7 @@ export class Router {
             } catch (err) {
               console.error(`  ❌ Auto-snapshot error: ${err}`);
             }
-          }, 500); // 500ms delay for command execution
+          }, AUTO_SNAPSHOT_DELAY); // Auto-snapshot delay
         }
       } catch (err) {
         console.error(`  ❌ PTY error: ${err}`);
@@ -867,7 +873,7 @@ Existing instances keep their original size.`;
           this.stopAutoRefresh(sessionKey, chatId, instanceId);
         }
       }
-    }, 10000); // 10 seconds
+    }, AUTO_REFRESH_INTERVAL); // Auto-refresh interval
 
     this.refreshIntervals.set(sessionKey, interval);
   }
@@ -946,8 +952,8 @@ Existing instances keep their original size.`;
       .replace(/>/g, '&gt;');
 
     // Truncate for Telegram message limits
-    if (escaped.length > 3500) {
-      return `<pre>${escaped.slice(0, 3500)}\n... (truncated)</pre>`;
+    if (escaped.length > MAX_MESSAGE_LENGTH) {
+      return `<pre>${escaped.slice(0, MAX_MESSAGE_LENGTH)}\n... (truncated)</pre>`;
     }
     return `<pre>${escaped}</pre>`;
   }
