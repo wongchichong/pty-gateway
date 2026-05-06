@@ -10,6 +10,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "fs";
 import { join, dirname } from "path";
 import { homedir } from "os";
 import AnsiToHtml from "ansi-to-html";
+import { checkRateLimit, getRateLimitMessage } from "./rate-limiter.js";
 
 // ── Session Management ───────────────────────────────────────────────────
 
@@ -168,6 +169,19 @@ export class Router {
     console.log(`  Text: "${msg.text}"`);
     console.log(`  Message ID: ${msg.id}`);
     if (msg.replyTo) console.log(`  Reply to: ${msg.replyTo}`);
+
+    // Rate limiting check
+    const { allowed, remaining } = checkRateLimit(msg.channel, msg.userId);
+    if (!allowed) {
+      const channel = this.channels.get(msg.channel);
+      if (channel) {
+        await channel.sendMessage(msg.chatId, getRateLimitMessage(msg.channel));
+      }
+      console.log(`[${msg.channel}] ⚠️ Rate limit exceeded for user ${msg.userId}`);
+      return;
+    }
+
+    console.log(`[${msg.channel}] ✅ Rate limit check passed (${remaining} remaining)`);
 
     // Notify message handlers
     for (const handler of this.messageHandlers) {
