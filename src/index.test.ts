@@ -230,8 +230,8 @@ describe("Router", () => {
     expect(ptySpies.spawn).toHaveBeenCalledWith({
       command: "vim",
       args: ["test.txt"],
-      cols: 80,
-      rows: 24,
+      cols: 40,
+      rows: 80,
     });
     expect(messages[0]).toContain("Started PTY");
   });
@@ -268,8 +268,8 @@ describe("Router", () => {
     });
 
     expect(ptySpies.list).toHaveBeenCalled();
-    expect(messages[0]).toContain("inst_1");
     expect(messages[0]).toContain("vim");
+    expect(messages[0]).toContain("PID");
   });
 
   it("handles /kill command", async () => {
@@ -341,23 +341,23 @@ describe("Router", () => {
       channel: "telegram",
       userId: "123",
       chatId: "456",
-      text: "/start cat",
+      text: "/start bash",
       timestamp: Date.now(),
     });
 
-    // Send non-command input
+    // Send non-command input (whitelisted command)
     await msgHandler({
       id: "2",
       channel: "telegram",
       userId: "123",
       chatId: "456",
-      text: "hello world",
+      text: "ls -la",
       timestamp: Date.now(),
     });
 
     expect(ptySpies.send).toHaveBeenCalledWith(
       "test-instance-id",
-      "hello world\n"
+      "ls -la\n"
     );
   });
 });

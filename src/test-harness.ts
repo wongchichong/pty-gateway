@@ -12,6 +12,7 @@ export const telegramSpies = {
   init: vi.fn(),
   sendMessage: vi.fn(async () => ({ message_id: 1 })),
   getMe: vi.fn(async () => ({ username: "test_bot" })),
+  setMyCommands: vi.fn(async () => true),
   botInfo: { username: "test_bot" },
 };
 
@@ -21,6 +22,7 @@ vi.mock("grammy", () => ({
     api = {
       sendMessage: telegramSpies.sendMessage,
       getMe: telegramSpies.getMe,
+      setMyCommands: telegramSpies.setMyCommands,
     };
     botInfo = telegramSpies.botInfo;
     on = telegramSpies.on;
@@ -141,6 +143,13 @@ vi.mock("./pty-client.js", () => ({
     subscribe = ptySpies.subscribe;
     unsubscribe = ptySpies.unsubscribe;
   },
+}));
+
+// ── Rate Limiter Mock ─────────────────────────────────────────────────────
+
+vi.mock("./rate-limiter.js", () => ({
+  checkRateLimit: vi.fn(() => ({ allowed: true, remaining: 10 })),
+  getRateLimitMessage: vi.fn(() => "Rate limit exceeded"),
 }));
 
 // ── Test Helpers ──────────────────────────────────────────────────────────
