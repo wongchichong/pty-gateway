@@ -12,6 +12,27 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "fs";
 import { join } from "path";
 import { homedir } from "os";
 
+// ── Environment Validation ────────────────────────────────────────────────────
+
+function validateEnvironment(): void {
+  const required = [
+    'TELEGRAM_BOT_TOKEN',
+  ];
+
+  const missing = required.filter(key => !process.env[key]);
+
+  if (missing.length > 0) {
+    console.error('❌ Missing required environment variables:');
+    missing.forEach(key => console.error(`  - ${key}`));
+    console.error('\nSet them via:');
+    console.error('  export TELEGRAM_BOT_TOKEN="your-token"');
+    console.error('  TELEGRAM_ALLOWED_USERS="your-user-id"');
+    console.error('  or');
+    console.error('  TELEGRAM_BOT_TOKEN="your-token" pm2 start ecosystem.config.js');
+    process.exit(1);
+  }
+}
+
 // ── Config Storage ────────────────────────────────────────────────────────
 
 const CONFIG_DIR = join(homedir(), ".pty-gateway");
@@ -816,6 +837,9 @@ async function listCommand(pty: PtyClient) {
 // ── Main ─────────────────────────────────────────────────────────────────
 
 async function main() {
+  // Validate environment variables
+  validateEnvironment();
+
   const options = parseArgs();
 
   // Run registration wizard

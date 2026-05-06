@@ -10,8 +10,8 @@ module.exports = {
       env: {
         NODE_ENV: "production",
         PTY_URL: "http://localhost:3000",
-        TELEGRAM_BOT_TOKEN: "8520957421:AAGBrVEnuGDeFAfAE1GRyJ_-0rJSTL9FtKU",
-        TELEGRAM_ALLOWED_USERS: "255433743",
+        TELEGRAM_BOT_TOKEN: process.env.TELEGRAM_BOT_TOKEN,
+        TELEGRAM_ALLOWED_USERS: process.env.TELEGRAM_ALLOWED_USERS,
       },
 
       // Auto-restart configuration
@@ -44,7 +44,7 @@ module.exports = {
       // Environment
       env: {
         PTY_URL: "http://localhost:3000",
-        TELEGRAM_BOT_TOKEN: "8520957421:AAGBrVEnuGDeFAfAE1GRyJ_-0rJSTL9FtKU",
+        TELEGRAM_BOT_TOKEN: process.env.TELEGRAM_BOT_TOKEN,
         AUTO_RESTART: "false", // Set to true to enable auto-restart
       },
 
