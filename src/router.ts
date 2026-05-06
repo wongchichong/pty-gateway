@@ -797,6 +797,10 @@ Existing instances keep their original size.`;
     // Initialize edit counter
     this.editCounters.set(sessionKey, 0);
 
+    // Error counter for recovery
+    let errorCount = 0;
+    const MAX_ERRORS = 3;
+
     const interval = setInterval(async () => {
       try {
         const session = this.sessions.get(sessionKey);
@@ -852,8 +856,16 @@ Existing instances keep their original size.`;
 
         // Update last activity
         session.lastActivity = Date.now();
+
+        // Reset error count on success
+        errorCount = 0;
       } catch (err) {
         console.error(`  ❌ Auto-refresh error: ${err}`);
+        errorCount++;
+        if (errorCount >= MAX_ERRORS) {
+          console.error(`  🛑 Stopping auto-refresh after ${MAX_ERRORS} consecutive errors`);
+          this.stopAutoRefresh(sessionKey, chatId, instanceId);
+        }
       }
     }, 10000); // 10 seconds
 
