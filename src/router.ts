@@ -47,6 +47,9 @@ const DEFAULT_SAFE_COMMANDS = [
 
   // Misc safe commands
   "man", "help", "exit", "logout", "true", "false", "yes", "no", "sleep",
+
+  // Windows shells
+  "cmd", "powershell", "pwsh",
 ];
 
 // Configuration constants
