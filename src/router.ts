@@ -8,9 +8,8 @@ import type {
 } from "./channels/types.js";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "fs";
 import { join, dirname } from "path";
-import { homedir } from "os";
+import { homedir, platform } from "os";
 import AnsiToHtml from "ansi-to-html";
-import { checkRateLimit, getRateLimitMessage } from "./rate-limiter.js";
 
 // ── Command Whitelist ───────────────────────────────────────────────────
 
@@ -244,7 +243,14 @@ export class Router {
   }
 
   async startAll() {
-    const starts = Array.from(this.channels.values()).map((ch) => ch.start());
+    const starts = Array.from(this.channels.values()).map(async (ch) => {
+      try {
+        await ch.start();
+      } catch (err) {
+        console.error(`[${ch.type}] Failed to start: ${err}`);
+        // Don't throw - allow other channels to continue
+      }
+    });
     await Promise.all(starts);
   }
 
@@ -270,19 +276,6 @@ export class Router {
     console.log(`  Message ID: ${msg.id}`);
     if (msg.replyTo) console.log(`  Reply to: ${msg.replyTo}`);
 
-    // Rate limiting check
-    const { allowed, remaining } = checkRateLimit(msg.channel, msg.userId);
-    if (!allowed) {
-      const channel = this.channels.get(msg.channel);
-      if (channel) {
-        await channel.sendMessage(msg.chatId, getRateLimitMessage(msg.channel));
-      }
-      console.log(`[${msg.channel}] ⚠️ Rate limit exceeded for user ${msg.userId}`);
-      return;
-    }
-
-    console.log(`[${msg.channel}] ✅ Rate limit check passed (${remaining} remaining)`);
-
     // Notify message handlers
     for (const handler of this.messageHandlers) {
       await handler(msg);
@@ -303,32 +296,26 @@ export class Router {
 
     // If user has an active session, send input to PTY
     if (session) {
+      // Show typing indicator for Matrix
+      const channel = this.channels.get(msg.channel);
+      if (channel?.type === "matrix" && "sendTyping" in channel) {
+        await (channel as any).sendTyping(msg.chatId, 5000);
+      }
+
       // Check if it's a gateway command (starts with /)
       const isGatewayCommand = text.startsWith("/");
 
       // Validate PTY commands (not gateway commands)
+      // No whitelist - allow all commands for personal use
       if (!isGatewayCommand) {
-        const safeCommands = process.env.ALLOWED_COMMANDS
-          ? process.env.ALLOWED_COMMANDS.split(",").map(c => c.trim())
-          : DEFAULT_SAFE_COMMANDS;
-
-        const validation = validateCommand(text, safeCommands);
-
-        if (!validation.valid) {
-          const channel = this.channels.get(msg.channel);
-          if (channel) {
-            await channel.sendMessage(msg.chatId, `❌ ${validation.reason}`);
-          }
-          console.log(`[${msg.channel}] ⚠️ Command blocked: ${text}`);
-          return;
-        }
-
-        console.log(`[${msg.channel}] ✅ Command validated: ${text}`);
+        console.log(`[${msg.channel}] Command: ${text}`);
       }
+
+      const newLine = platform() === "win32" ? "\r\n" : "\n";
 
       console.log(`  📤 Sending to PTY instance: ${session.instanceId}`);
       try {
-        await this.pty.send(session.instanceId, msg.text + "\n");
+        await this.pty.send(session.instanceId, msg.text + newLine);
         session.lastActivity = Date.now();
 
         // Auto-snapshot: Send snapshot immediately after command execution
@@ -339,6 +326,11 @@ export class Router {
             try {
               const lastMsg = this.lastMessages.get(`${msg.chatId}:${session.instanceId}`);
               await this.sendSnapshot(session.instanceId, msg.chatId, channel, lastMsg?.id);
+
+              // Stop typing indicator after snapshot sent
+              if (channel.type === "matrix" && "stopTyping" in channel) {
+                await (channel as any).stopTyping(msg.chatId);
+              }
             } catch (err) {
               console.error(`  ❌ Auto-snapshot error: ${err}`);
             }
@@ -349,6 +341,10 @@ export class Router {
         const channel = this.channels.get(msg.channel);
         if (channel) {
           await channel.sendMessage(msg.chatId, `Error: ${err}`);
+          // Send failure reaction for Matrix
+          if (channel.type === "matrix" && "sendReaction" in channel) {
+            await (channel as any).sendReaction(msg.chatId, msg.id, "❌");
+          }
         }
       }
     } else {
@@ -389,7 +385,7 @@ export class Router {
 
       case "kill":
       case "pty-kill":
-        await this.cmdKill(msg, channel, session);
+        await this.cmdKill(msg, cmd.args, channel, session);
         break;
 
       case "list":
@@ -417,7 +413,8 @@ export class Router {
       default:
         // Unknown command - if in session, send to PTY
         if (session) {
-          await this.pty.send(session.instanceId, msg.text + "\n");
+          const newLine = platform() === "win32" ? "\r\n" : "\n";
+          await this.pty.send(session.instanceId, msg.text + newLine);
         } else {
           await channel.sendMessage(
             msg.chatId,
@@ -550,32 +547,96 @@ export class Router {
 
     const shortId = this.toShortId(instanceId);
     const sessionKey = this.getSessionKey(msg.channel, msg.chatId);
+    const session = this.sessions.get(sessionKey);
+    const currentCols = session?.cols || 80;
+    const currentRows = session?.rows || 24;
+
+    // Apply session size preference when reconnecting
+    await this.pty.resize(instanceId, currentCols, currentRows);
+
     this.sessions.set(sessionKey, {
       instanceId,
       channel: msg.channel,
       chatId: msg.chatId,
       lastActivity: Date.now(),
+      cols: currentCols,
+      rows: currentRows,
     });
 
     this.pty.subscribe(instanceId);
 
-    await channel.sendMessage(
-      msg.chatId,
-      `✅ Connected to PTY: ${shortId}\nCommand: ${instance.name}\nPID: ${instance.pid}`
-    );
+    console.log(`  📤 /connect: starting auto-refresh`);
 
-    // Send initial snapshot and start auto-refresh
+    // Send snapshot immediately after resize, then start auto-refresh
     await this.sendSnapshot(instanceId, msg.chatId, channel);
     this.startAutoRefresh(sessionKey, instanceId, msg.chatId, channel);
   }
 
   private async cmdKill(
     msg: ChannelMessage,
+    args: string[],
     channel: Channel,
     session?: UserSession
   ) {
+    // If ID provided, kill that specific instance
+    if (args.length > 0) {
+      const targetId = args[0];
+
+      try {
+        // Resolve short ID to full ID
+        const instances = await this.pty.list();
+        let instanceId = targetId;
+
+        // Check if it's a short ID (numeric)
+        if (/^\d+$/.test(targetId)) {
+          const idMapFile = join(homedir(), ".pty-gateway", "instance-ids.json");
+          if (existsSync(idMapFile)) {
+            const data = readFileSync(idMapFile, "utf8");
+            const map = JSON.parse(data);
+            if (map[targetId]) {
+              instanceId = map[targetId];
+            }
+          }
+        }
+
+        // Try partial match if still not found
+        if (instanceId === targetId) {
+          const match = instances.find(i => i.id === targetId || i.id.startsWith(targetId));
+          if (match) {
+            instanceId = match.id;
+          }
+        }
+
+        // Find the instance
+        const instance = instances.find(i => i.id === instanceId);
+        if (!instance) {
+          await channel.sendMessage(msg.chatId, `Instance not found: ${targetId}`);
+          return;
+        }
+
+        // Kill it
+        await this.pty.kill(instanceId);
+        const shortId = this.toShortId(instanceId);
+
+        // Clean up any sessions using this instance
+        for (const [key, sess] of this.sessions.entries()) {
+          if (sess.instanceId === instanceId) {
+            this.sessions.delete(key);
+            this.pty.unsubscribe(instanceId);
+            this.stopAutoRefresh(key, msg.chatId, instanceId);
+          }
+        }
+
+        await channel.sendMessage(msg.chatId, `Killed PTY: ${shortId} (${instance.name})`);
+      } catch (err) {
+        await channel.sendMessage(msg.chatId, `Failed to kill ${targetId}: ${err}`);
+      }
+      return;
+    }
+
+    // No ID - kill current session
     if (!session) {
-      await channel.sendMessage(msg.chatId, "No active session to kill.");
+      await channel.sendMessage(msg.chatId, "No active session. Use /kill <id> to kill a specific instance.");
       return;
     }
 
@@ -626,6 +687,11 @@ export class Router {
     if (!session) {
       await channel.sendMessage(msg.chatId, "No active session.");
       return;
+    }
+
+    // Resize PTY to session size before snapshot
+    if (session.cols && session.rows) {
+      await this.pty.resize(session.instanceId, session.cols, session.rows);
     }
 
     await this.sendSnapshot(session.instanceId, msg.chatId, channel);
@@ -747,8 +813,8 @@ Existing instances keep their original size.`;
       await channel.sendMessage(msg.chatId, `Columns must be between 20 and 200 (got ${cols})`);
       return;
     }
-    if (rows < 10 || rows > 100) {
-      await channel.sendMessage(msg.chatId, `Rows must be between 10 and 100 (got ${rows})`);
+    if (rows < 10 || rows > 9999) {
+      await channel.sendMessage(msg.chatId, `Rows must be between 10 and 9999 (got ${rows})`);
       return;
     }
 
@@ -757,7 +823,10 @@ Existing instances keep their original size.`;
     if (session) {
       session.cols = cols;
       session.rows = rows;
-      await channel.sendMessage(msg.chatId, `✅ Size set to ${cols}x${rows}\nNew PTY instances will use this size.`);
+
+      // Resize active PTY and send updated snapshot
+      await this.pty.resize(session.instanceId, cols, rows);
+      await this.sendSnapshot(session.instanceId, msg.chatId, channel);
     } else {
       // Create temporary session entry just for size preference
       this.sessions.set(sessionKey, {
@@ -828,8 +897,18 @@ Existing instances keep their original size.`;
     let errorCount = 0;
     const MAX_ERRORS = 3;
 
+    // Delay first refresh to let /connect message go through first
+    let isFirstRun = true;
+
     const interval = setInterval(async () => {
       try {
+        // Skip first run - /connect already sends a message
+        if (isFirstRun) {
+          isFirstRun = false;
+          console.log(`  ⏭️  Skipping initial auto-refresh (already sent)`);
+          return;
+        }
+
         const session = this.sessions.get(sessionKey);
         if (!session) {
           this.stopAutoRefresh(sessionKey);
@@ -958,25 +1037,22 @@ Existing instances keep their original size.`;
   }
 
   private formatSnapshot(snapshot: PtySnapshot): string {
-    const lines = snapshot.visibleLines;
+    let lines = snapshot.visibleLines;
     if (lines.length === 0) {
       return "(empty buffer)";
     }
 
-    // Join lines and wrap in HTML <pre> tag for Telegram
-    const content = lines.join("\n");
-
-    // Escape HTML special characters
-    const escaped = content
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;');
-
-    // Truncate for Telegram message limits
-    if (escaped.length > MAX_MESSAGE_LENGTH) {
-      return `<pre>${escaped.slice(0, MAX_MESSAGE_LENGTH)}\n... (truncated)</pre>`;
+    // Trim trailing empty lines to avoid showing blank space
+    while (lines.length > 0 && lines[lines.length - 1].trim() === "") {
+      lines = lines.slice(0, -1);
     }
-    return `<pre>${escaped}</pre>`;
+
+    if (lines.length === 0) {
+      return "(empty buffer)";
+    }
+
+    // Return plain text - each channel handles its own formatting
+    return lines.join("\n");
   }
 
   // ── PTY Event Handling ────────────────────────────────────────────────

@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import { platform } from "os";
 import "./test-harness.js";
 import { TelegramChannel } from "./channels/telegram.js";
 import { DiscordChannel } from "./channels/discord.js";
@@ -355,9 +356,11 @@ describe("Router", () => {
       timestamp: Date.now(),
     });
 
+    const expectedNewline = platform() === "win32" ? "\r\n" : "\n";
+
     expect(ptySpies.send).toHaveBeenCalledWith(
       "test-instance-id",
-      "ls -la\n"
+      `ls -la${expectedNewline}`
     );
   });
 });
