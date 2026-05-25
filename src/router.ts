@@ -179,7 +179,7 @@ export class Router {
         }
       }
     } catch (err) {
-      // Ignore errors
+      console.error(`[Router] Failed to load ID map: ${err}`);
     }
   }
 
@@ -195,7 +195,7 @@ export class Router {
       }
       writeFileSync(this.idMapFile, JSON.stringify(map, null, 2));
     } catch (err) {
-      // Ignore errors
+      console.error(`[Router] Failed to save ID map: ${err}`);
     }
   }
 
@@ -211,7 +211,7 @@ export class Router {
       }
       this.saveIdMap();
     } catch (err) {
-      // Ignore errors during initialization
+      console.error(`[Router] Failed to initialize ID map: ${err}`);
     }
   }
 
@@ -1037,22 +1037,17 @@ Existing instances keep their original size.`;
   }
 
   private formatSnapshot(snapshot: PtySnapshot): string {
-    let lines = snapshot.visibleLines;
+    const lines = [...snapshot.visibleLines];
     if (lines.length === 0) {
       return "(empty buffer)";
     }
 
     // Trim trailing empty lines to avoid showing blank space
     while (lines.length > 0 && lines[lines.length - 1].trim() === "") {
-      lines = lines.slice(0, -1);
+      lines.pop();
     }
 
-    if (lines.length === 0) {
-      return "(empty buffer)";
-    }
-
-    // Return plain text - each channel handles its own formatting
-    return lines.join("\n");
+    return lines.length === 0 ? "(empty buffer)" : lines.join("\n");
   }
 
   // ── PTY Event Handling ────────────────────────────────────────────────

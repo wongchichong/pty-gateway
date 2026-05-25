@@ -41,7 +41,7 @@ See: .planning/PROJECT.md (updated 2026-05-06)
 1. **Phase 1: Security Fixes** ✅
    - SEC-01: Remove hardcoded token from ecosystem.config.js
    - SEC-02: Remove hardcoded token from pty-gateway.service
-   - SEC-03: Add rate limiting middleware
+   - SEC-03: Add rate limiting middleware (removed - not needed for personal use)
    - SEC-04: Add command input validation (later removed for personal use)
 
 2. **Phase 2: Reliability Fixes** ✅
@@ -54,8 +54,7 @@ See: .planning/PROJECT.md (updated 2026-05-06)
    - TEST-01: Fix setMyCommands mock
    - TEST-02: Fix terminal size expectations
    - TEST-03: Fix /list test format
-   - TEST-04: Mock rate limiter in tests
-   - TEST-05: Update test commands
+   - TEST-04: Update test commands
 
 4. **Phase 4: Operations Updates** ✅
    - OPS-01: Update OPERATIONS.md

@@ -5,13 +5,25 @@ import type {
   MessageHandler,
   SendMessageOptions,
 } from "./types.js";
-import { spawn, ChildProcess } from "child_process";
+import { spawn } from "child_process";
 
 export interface IMessageConfig {
   /** AppleScript path (default: osascript) */
   osascriptPath?: string;
   /** Watch for new messages */
   watchMessages?: boolean;
+}
+
+/**
+ * Escape special characters for AppleScript string literals
+ */
+function escapeForAppleScript(str: string): string {
+  return str
+    .replace(/\\/g, "\\\\")
+    .replace(/"/g, '\\"')
+    .replace(/\n/g, "\\n")
+    .replace(/\r/g, "\\r")
+    .replace(/\t/g, "\\t");
 }
 
 export class IMessageChannel implements Channel {
@@ -85,9 +97,11 @@ export class IMessageChannel implements Channel {
     }
 
     // Use AppleScript to send message
+    const escapedText = escapeForAppleScript(text);
+    const escapedChatId = escapeForAppleScript(chatId);
     const script = `
       tell application "Messages"
-        send "${text.replace(/"/g, '\\"')}" to buddy "${chatId}"
+        send "${escapedText}" to buddy "${escapedChatId}"
       end tell
     `;
 

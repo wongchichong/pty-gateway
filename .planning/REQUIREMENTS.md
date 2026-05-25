@@ -14,11 +14,9 @@
   - Update service file to use `Environment="TELEGRAM_BOT_TOKEN=${TOKEN}"`
   - Add setup instructions for systemd deployment
 
-- [ ] **SEC-03**: Add rate limiting middleware
-  - Limit: 5 commands per minute per user
-  - Use rate limiter library (e.g., `limiter` package)
-  - Return "Rate limit exceeded" message when limit hit
-  - Apply to all messaging channels
+- [x] **SEC-03**: Add rate limiting middleware (REMOVED - not needed for personal use)
+  - Rate limiting was implemented but removed for personal use
+  - Feature not needed for single-user deployment
 
 - [ ] **SEC-04**: Add PTY command input validation
   - Implement command whitelist: `["ls", "pwd", "htop", "vim", "bash", "cat", "grep", "find", "echo", "clear"]`
@@ -75,7 +73,6 @@
 - [ ] **TEST-03**: Add error scenario tests
   - Test network failures (PTY service unavailable)
   - Test invalid inputs (malformed commands)
-  - Test rate limiting behavior
   - Test command validation blocking
 
 ### Operations
@@ -137,7 +134,7 @@
 
 - **Health dashboard UI** — Monitoring scripts (`monitor-gateway.ts`, `check-telegram-queue.ts`) provide sufficient visibility.
 
-- **Performance optimization beyond memory/rate limiting** — Current performance acceptable. Optimize only if metrics show issues.
+- **Performance optimization beyond memory cleanup** — Current performance acceptable. Optimize only if metrics show issues.
 
 ### Explicitly Excluded
 
@@ -153,7 +150,7 @@
 |--------|-------|--------|
 | SEC-01 | Phase 1: Security Fixes | Planned |
 | SEC-02 | Phase 1: Security Fixes | Planned |
-| SEC-03 | Phase 1: Security Fixes | Planned |
+| SEC-03 | Phase 1: Security Fixes | Removed |
 | SEC-04 | Phase 1: Security Fixes | Planned |
 | REL-01 | Phase 2: Reliability Fixes | Planned |
 | REL-02 | Phase 2: Reliability Fixes | Planned |

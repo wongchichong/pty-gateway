@@ -59,7 +59,6 @@ if (lastMsg.text === text) {
 ### 4. **Edit Limit Management**
 
 Telegram doesn't have a hard limit on edits, but:
-- Frequent edits can trigger rate limits
 - Old messages become stale
 - Better UX with periodic fresh messages
 
@@ -267,7 +266,6 @@ timeout 60 tail -f /tmp/gateway-new.log | \
 2. Common causes:
    - Message too old (>48h)
    - Message deleted by user
-   - Rate limiting
 
 ## Related Files
 
@@ -279,4 +277,3 @@ timeout 60 tail -f /tmp/gateway-new.log | \
 
 - [Telegram Bot API - editMessageText](https://core.telegram.org/bots/api#editmessagetext)
 - [Telegram Bot API - deleteMessage](https://core.telegram.org/bots/api#deletemessage)
-- [Telegram Rate Limits](https://core.telegram.org/bots/faq#my-bot-is-hitting-limits-how-do-i-avoid-this)

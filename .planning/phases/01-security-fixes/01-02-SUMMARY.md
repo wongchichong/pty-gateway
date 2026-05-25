@@ -70,7 +70,7 @@ sudo systemctl start pty-gateway
 ## Next Steps
 
 **Remaining in Phase 1:**
-- Plan 01-03: Add rate limiting middleware
+- Plan 01-03: Add rate limiting (REMOVED - personal use)
 - Plan 01-04: Add command input validation
 
 **Deployment:**

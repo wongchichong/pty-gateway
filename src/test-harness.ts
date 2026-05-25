@@ -145,13 +145,6 @@ vi.mock("./pty-client.js", () => ({
   },
 }));
 
-// ── Rate Limiter Mock ─────────────────────────────────────────────────────
-
-vi.mock("./rate-limiter.js", () => ({
-  checkRateLimit: vi.fn(() => ({ allowed: true, remaining: 10 })),
-  getRateLimitMessage: vi.fn(() => "Rate limit exceeded"),
-}));
-
 // ── Test Helpers ──────────────────────────────────────────────────────────
 
 export function createTelegramCtx(options: {

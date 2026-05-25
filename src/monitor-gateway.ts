@@ -28,7 +28,11 @@ async function checkPtyServer(): Promise<boolean> {
 async function checkTelegramQueue(): Promise<number> {
   try {
     const { Bot } = await import("grammy");
-    const token = process.env.TELEGRAM_BOT_TOKEN || "8520957421:AAGBrVEnuGDeFAfAE1GRyJ_-0rJSTL9FtKU";
+    const token = process.env.TELEGRAM_BOT_TOKEN;
+if (!token) {
+  console.error("TELEGRAM_BOT_TOKEN environment variable not set");
+  process.exit(1);
+}
 
     const bot = new Bot(token);
     const updates = await bot.api.getUpdates({ limit: 100, timeout: 0 });

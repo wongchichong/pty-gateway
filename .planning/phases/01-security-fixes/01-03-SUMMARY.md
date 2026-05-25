@@ -1,101 +1,88 @@
-# SUMMARY: Add Rate Limiting Middleware
+# SUMMARY: Remove Rate Limiting (Feature Removed)
 
 **Plan ID**: 01-03
 **Phase**: 1 - Security Fixes
-**Status**: ✅ Complete
-**Commit**: security: add rate limiting middleware
+**Status**: ⚠️  Removed
+**Reason**: Rate limiting removed for personal use - not needed for single-user deployment
 
 ## What Was Done
 
-### Task 1: Install Rate Limiter Package ✅
-- Added `limiter` package to dependencies
-- Added `@types/limiter` to devDependencies
+**This plan was ultimately NOT implemented.**
 
-### Task 2: Create Rate Limiter Module ✅
-- Created `src/rate-limiter.ts` with per-user rate limiting
-- Implemented per-channel-type limits (Telegram: 5/min, Discord: 10/min, etc.)
-- Token bucket algorithm for smooth rate limiting
-- Automatic cache cleanup every 5 minutes
+Rate limiting was previously implemented in the codebase but has been removed because:
+- Personal use deployment doesn't require DoS protection
+- Single user or small group usage makes rate limiting unnecessary
+- Reduces complexity and dependencies
 
-### Task 3: Integrate Rate Limiter into Router ✅
-- Added rate limit check in `handleChannelMessage()` method
-- Returns friendly error message when limit exceeded
-- Logs rate limit events for monitoring
-- Per-user tracking across all channel types
+## Implementation History
 
-### Task 4: Configuration Support ✅
-- Environment variable support: `RATE_LIMIT_TOKENS`, `RATE_LIMIT_INTERVAL`
-- Per-channel defaults configured
-- Fallback to safe defaults (5 commands/minute)
+### Original Plan
+- Create rate limiter middleware: 5 commands/minute per user
+- Use `limiter` package
+- Track per-user rate limits
+- Return friendly error message when limit exceeded
 
-## Files Modified
+### What Was Removed
+- `src/rate-limiter.ts` - Removed from codebase
+- Rate limit checks in `src/router.ts` - Removed
+- `RATE_LIMIT_TOKENS`, `RATE_LIMIT_INTERVAL` env vars - Not used
+- `limiter` package - Not needed
 
-- `package.json` - Added limiter dependency
-- `src/rate-limiter.ts` - New rate limiter module (new file)
-- `src/router.ts` - Integrated rate limiting check
+## Files Affected
 
-## Testing
+**Removed:**
+- `src/rate-limiter.ts` - Rate limiter module (deleted)
 
-**Test 1: Normal usage**
+**Modified:**
+- `src/router.ts` - Rate limit check removed from `handleChannelMessage()`
+- `src/test-harness.ts` - Rate limiter mock removed
+
+## Context
+
+Personal use deployments don't need rate limiting because:
+1. Single user or trusted users only
+2. No risk of DoS attacks from multiple users
+3. Reduces code complexity and dependencies
+4. Simpler operational requirements
+
+## If Rate Limiting Is Needed Later
+
+To re-implement rate limiting:
+
+1. Install the `limiter` package:
 ```bash
-# Send 5 commands rapidly
-# Expected: All succeed ✅
+npm install limiter
+npm install --save-dev @types/limiter
 ```
 
-**Test 2: Rate limit exceeded**
-```bash
-# Send 6th command immediately after 5
-# Expected: "⚠️ Rate limit exceeded" message ✅
+2. Create `src/rate-limiter.ts`:
+```typescript
+import { RateLimiter } from "limiter";
+
+const userLimiters = new Map<string, RateLimiter>();
+
+export function checkRateLimit(channel: string, userId: string) {
+  const key = `${channel}:${userId}`;
+  let limiter = userLimiters.get(key);
+  if (!limiter) {
+    limiter = new RateLimiter({ tokensPerInterval: 5, interval: "minute" });
+    userLimiters.set(key, limiter);
+  }
+  return { allowed: limiter.tryRemoveTokens(1), remaining: limiter.getTokensRemaining() };
+}
 ```
 
-**Test 3: Different users**
-```bash
-# User A sends 5 commands (succeeds)
-# User B sends 5 commands (succeeds - separate limit) ✅
+3. Add check in `src/router.ts` `handleChannelMessage()`:
+```typescript
+const { allowed } = checkRateLimit(msg.channel, msg.userId);
+if (!allowed) {
+  await channel.sendMessage(msg.chatId, "Rate limit exceeded");
+  return;
+}
 ```
 
-**Test 4: Limit resets**
-```bash
-# Wait 1 minute after hitting limit
-# Send command
-# Expected: Command succeeds ✅
-```
+## Status
 
-## Success Criteria
-
-- [x] `limiter` package installed
-- [x] `src/rate-limiter.ts` created with per-user limits
-- [x] Rate limiting integrated into `src/router.ts`
-- [x] Environment variable configuration supported
-- [x] Test: 6th command within 1 minute returns rate limit message
-- [x] Test: Different users have separate limits
-- [x] Test: Limit resets after interval
-
-## Configuration
-
-**Per-Channel Defaults:**
-- Telegram: 5/minute (conservative for mobile users)
-- Discord: 10/minute (desktop users, higher tolerance)
-- IRC: 20/minute (traditional IRC norms)
-- WebChat: 30/minute (direct access, higher limits)
-- WhatsApp/Signal: 5/minute (mobile messaging)
-
-**Environment Variables:**
-- `RATE_LIMIT_TOKENS` — Commands per interval (default: 5)
-- `RATE_LIMIT_INTERVAL` — Time interval: "minute" or "second" (default: "minute")
-
-## Performance Impact
-
-- **Memory**: Minimal - one RateLimiter object per active user (~100 bytes each)
-- **CPU**: Negligible - simple token bucket algorithm
-- **Latency**: < 1ms per message for rate check
-
-## Next Steps
-
-**Remaining in Phase 1:**
-- Plan 01-04: Add command input validation
-
-**Monitoring:**
-- Watch for rate limit warnings in logs
-- Adjust limits per channel if needed
-- Consider implementing user-specific limits for power users
+**SEC-03: Add rate limiting** - REMOVED from requirements
+- Not a production blocker for personal use
+- Can be re-added if multi-user deployment is needed

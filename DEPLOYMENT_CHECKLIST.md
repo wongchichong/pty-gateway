@@ -12,8 +12,6 @@ export TELEGRAM_ALLOWED_USERS="your-user-id"
 
 # Optional (with defaults)
 export PTY_URL="http://localhost:3000"
-export RATE_LIMIT_TOKENS="5"
-export RATE_LIMIT_INTERVAL="minute"
 ```
 
 ### 2. Verify PTY Service
@@ -81,13 +79,7 @@ pm2 logs pty-gateway --lines 20
 # Expected: "Started PTY: 1\nCommand: bash\nPID: <pid>"
 ```
 
-### 3. Test Rate Limiting
-```bash
-# Send 6 commands rapidly
-# Expected: Rate limit message on 6th command
-```
-
-### 4. Test Session Management
+### 3. Test Session Management
 ```bash
 /start vim test.txt
 # Type: i (insert mode)
@@ -169,7 +161,6 @@ sudo systemctl status pty-gateway
 
 - [ ] Bot token not in git
 - [ ] Allowed users configured
-- [ ] Rate limiting enabled
 - [ ] PTY service isolated
 - [ ] Logs monitored
 - [ ] Regular updates applied

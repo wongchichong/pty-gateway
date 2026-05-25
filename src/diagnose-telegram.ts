@@ -109,11 +109,6 @@ async function diagnose() {
         console.error("  Reason: No bot exists with this token");
         console.error("\n  Solution:");
         console.error("  Create a new bot with @BotFather using /newbot");
-      } else if (err.message.includes("429") || err.message.includes("Too Many Requests")) {
-        console.error("  Status: Rate limited");
-        console.error("  Reason: Too many requests to Telegram API");
-        console.error("\n  Solution:");
-        console.error("  Wait a few minutes before trying again");
       } else if (err.message.includes("ENOTFOUND") || err.message.includes("ECONNREFUSED")) {
         console.error("  Status: Network error");
         console.error("  Reason: Cannot reach Telegram API servers");

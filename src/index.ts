@@ -4,8 +4,10 @@ import { Router } from "./router.js";
 import {
   createTelegramChannel,
   createDiscordChannel,
+  createMatrixChannel,
   TelegramConfig,
   DiscordConfig,
+  MatrixConfig,
 } from "./channels/index.js";
 import type { Channel, ChannelMessage, MessageHandler } from "./channels/types.js";
 import { createInterface } from "readline";
@@ -49,6 +51,12 @@ interface GatewayConfig {
     botToken: string;
     guildId?: string;
     allowedChannels?: string[];
+  };
+  matrix?: {
+    homeserverUrl: string;
+    accessToken: string;
+    userId: string;
+    allowedRooms?: string[];
   };
   ptyUrl?: string;
   ptyToken?: string;
@@ -156,6 +164,55 @@ async function registerDiscord(rl: ReturnType<typeof createInterface>): Promise<
   return token.trim();
 }
 
+async function registerMatrix(rl: ReturnType<typeof createInterface>): Promise<{ homeserverUrl: string; accessToken: string; userId: string } | null> {
+  console.log(`
+╔══════════════════════════════════════════════════════════════════╗
+║                     MATRIX BOT REGISTRATION                      ║
+╠══════════════════════════════════════════════════════════════════╣
+║                                                                  ║
+║  Matrix is a decentralized chat protocol. You need:              ║
+║  1. A Matrix account (from matrix.org or any homeserver)        ║
+║  2. An access token for your bot user                            ║
+║                                                                  ║
+║  To get an access token:                                         ║
+║  - Log into Element (https://app.element.io) or your client       ║
+║  - Go to Settings > Help & About > Advanced                      ║
+║  - Scroll to "Access Token" and copy it                          ║
+║                                                                  ║
+║  Your User ID looks like: @username:matrix.org                   ║
+║                                                                  ║
+╚══════════════════════════════════════════════════════════════════╝
+`);
+
+  const homeserver = await prompt(rl, "Matrix homeserver URL (e.g., https://matrix.org): ");
+
+  if (!homeserver.trim()) {
+    console.log("Skipped Matrix registration.\n");
+    return null;
+  }
+
+  const userId = await prompt(rl, "Matrix User ID (e.g., @bot:matrix.org): ");
+
+  if (!userId.trim()) {
+    console.log("Skipped Matrix registration.\n");
+    return null;
+  }
+
+  const accessToken = await prompt(rl, "Matrix access token: ");
+
+  if (!accessToken.trim()) {
+    console.log("Skipped Matrix registration.\n");
+    return null;
+  }
+
+  console.log("\n✓ Matrix bot configured!\n");
+  return {
+    homeserverUrl: homeserver.trim(),
+    accessToken: accessToken.trim(),
+    userId: userId.trim(),
+  };
+}
+
 async function runRegistration() {
   const rl = createInterface({
     input: process.stdin,
@@ -168,7 +225,7 @@ async function runRegistration() {
   const config = loadConfig();
 
   // Show current config
-  if (config.telegram?.botToken || config.discord?.botToken) {
+  if (config.telegram?.botToken || config.discord?.botToken || config.matrix?.userId) {
     console.log("Current configuration:");
     if (config.telegram?.botToken) {
       console.log(`  Telegram: ${config.telegram.botToken.slice(0, 10)}...`);
@@ -176,23 +233,33 @@ async function runRegistration() {
     if (config.discord?.botToken) {
       console.log(`  Discord: ${config.discord.botToken.slice(0, 10)}...`);
     }
+    if (config.matrix?.userId) {
+      console.log(`  Matrix: ${config.matrix.userId}`);
+    }
     console.log();
   }
 
-  const register = await prompt(rl, "Register a new channel? (telegram/discord/both/skip): ");
+  const register = await prompt(rl, "Register a channel? (telegram/discord/matrix/all/skip): ");
   const choice = register.toLowerCase().trim();
 
-  if (choice === "telegram" || choice === "both") {
+  if (choice === "telegram" || choice === "all") {
     const token = await registerTelegram(rl);
     if (token) {
       config.telegram = { botToken: token };
     }
   }
 
-  if (choice === "discord" || choice === "both") {
+  if (choice === "discord" || choice === "all") {
     const token = await registerDiscord(rl);
     if (token) {
       config.discord = { botToken: token };
+    }
+  }
+
+  if (choice === "matrix" || choice === "all") {
+    const matrixConfig = await registerMatrix(rl);
+    if (matrixConfig) {
+      config.matrix = matrixConfig;
     }
   }
 
@@ -222,6 +289,10 @@ interface CliOptions {
   discordGuildId?: string;
   discordAllowedChannels?: string[];
   discordGlobalCommands?: boolean;
+  matrixHomeserver?: string;
+  matrixAccessToken?: string;
+  matrixUserId?: string;
+  matrixAllowedRooms?: string[];
   register?: boolean;
   command?: "chat" | "snapshot" | "connect" | "list" | "send";
   commandArgs?: string[];
@@ -240,6 +311,10 @@ function parseArgs(): CliOptions {
     telegramAllowedChats: config.telegram?.allowedChats,
     discordGuildId: config.discord?.guildId,
     discordAllowedChannels: config.discord?.allowedChannels,
+    matrixHomeserver: config.matrix?.homeserverUrl || process.env.MATRIX_HOMESERVER,
+    matrixAccessToken: config.matrix?.accessToken || process.env.MATRIX_ACCESS_TOKEN,
+    matrixUserId: config.matrix?.userId || process.env.MATRIX_USER_ID,
+    matrixAllowedRooms: config.matrix?.allowedRooms,
   };
 
   for (let i = 0; i < args.length; i++) {
@@ -307,6 +382,22 @@ function parseArgs(): CliOptions {
         options.discordGlobalCommands = true;
         break;
 
+      case "--matrix-homeserver":
+        options.matrixHomeserver = args[++i];
+        break;
+
+      case "--matrix-token":
+        options.matrixAccessToken = args[++i];
+        break;
+
+      case "--matrix-user":
+        options.matrixUserId = args[++i];
+        break;
+
+      case "--matrix-rooms":
+        options.matrixAllowedRooms = args[++i]?.split(",").map((s) => s.trim());
+        break;
+
       case "--register":
       case "-r":
         options.register = true;
@@ -331,7 +422,7 @@ function parseArgs(): CliOptions {
 
 function printHelp() {
   console.log(`
-PTY Gateway - Connect Telegram/Discord to PTY service
+PTY Gateway - Connect Telegram/Discord/Matrix to PTY service
 
 Usage: pty-gateway [options]
        pty-gateway <command> [args]
@@ -359,10 +450,19 @@ Discord:
   --discord-channels <ids>   Comma-separated allowed channel IDs
   --discord-global           Register slash commands globally
 
+Matrix:
+  --matrix-homeserver <url>  Matrix homeserver URL (e.g., https://matrix.org)
+  --matrix-token <token>     Matrix access token
+  --matrix-user <id>         Matrix user ID (e.g., @bot:matrix.org)
+  --matrix-rooms <ids>       Comma-separated allowed room IDs
+
 Environment Variables:
   PTY_URL                    PTY service URL
   TELEGRAM_BOT_TOKEN         Telegram bot token
   DISCORD_BOT_TOKEN          Discord bot token
+  MATRIX_HOMESERVER          Matrix homeserver URL
+  MATRIX_ACCESS_TOKEN        Matrix access token
+  MATRIX_USER_ID             Matrix user ID
   ALLOWED_COMMANDS           Comma-separated whitelist of PTY commands (default: safe list)
 
 Config file: ~/.pty-gateway/config.json
@@ -389,10 +489,18 @@ Examples:
   # Start with Telegram only
   pty-gateway --telegram-token "123456:ABC..."
 
-  # Start with both
+  # Start with Matrix
+  pty-gateway --matrix-homeserver "https://matrix.org" \\
+    --matrix-token "your-access-token" \\
+    --matrix-user "@bot:matrix.org"
+
+  # Start with all channels
   pty-gateway \\
     --telegram-token "$TELEGRAM_BOT_TOKEN" \\
-    --discord-token "$DISCORD_BOT_TOKEN"
+    --discord-token "$DISCORD_BOT_TOKEN" \\
+    --matrix-homeserver "https://matrix.org" \\
+    --matrix-token "$MATRIX_ACCESS_TOKEN" \\
+    --matrix-user "@bot:matrix.org"
 `);
 }
 
@@ -837,16 +945,26 @@ async function listCommand(pty: PtyClient) {
 // ── Main ─────────────────────────────────────────────────────────────────
 
 async function main() {
-  // Validate environment variables
-  validateEnvironment();
+  // Check for --help or --register before validating environment
+  if (process.argv.includes("--help") || process.argv.includes("-h")) {
+    printHelp();
+    process.exit(0);
+  }
 
-  const options = parseArgs();
-
-  // Run registration wizard
-  if (options.register) {
+  if (process.argv.includes("--register") || process.argv.includes("-r")) {
     await runRegistration();
     process.exit(0);
   }
+
+  // Validate environment variables (allow skip/disabled for Matrix-only mode)
+  const token = process.env.TELEGRAM_BOT_TOKEN;
+  if (!token || token === "skip" || token === "disabled") {
+    // Allow Matrix-only mode
+  } else {
+    validateEnvironment();
+  }
+
+  const options = parseArgs();
 
   // Handle subcommands
   if (options.command) {
@@ -855,12 +973,13 @@ async function main() {
   }
 
   // Check if at least one channel is configured
-  if (!options.telegramToken && !options.discordToken) {
+  if (!options.telegramToken && !options.discordToken && !options.matrixAccessToken) {
     console.error("Error: No channels configured.");
-    console.error("\nRun 'pty-gateway --register' to set up Telegram/Discord interactively.\n");
+    console.error("\nRun 'pty-gateway --register' to set up Telegram/Discord/Matrix interactively.\n");
     console.error("Or provide tokens via CLI:");
     console.error("  pty-gateway --telegram-token \"YOUR_TOKEN\"");
-    console.error("  pty-gateway --discord-token \"YOUR_TOKEN\"\n");
+    console.error("  pty-gateway --discord-token \"YOUR_TOKEN\"");
+    console.error("  pty-gateway --matrix-homeserver \"https://matrix.org\" --matrix-token \"TOKEN\" --matrix-user \"@bot:matrix.org\"\n");
     process.exit(1);
   }
 
@@ -897,8 +1016,8 @@ async function main() {
     console.error(`Failed to connect to PTY WebSocket: ${err}`);
   }
 
-  // Add Telegram channel
-  if (options.telegramToken) {
+  // Add Telegram channel (skip if disabled/placeholder token)
+  if (options.telegramToken && options.telegramToken !== "skip" && options.telegramToken !== "disabled") {
     const config: TelegramConfig = {
       botToken: options.telegramToken,
       allowedUsers: options.telegramAllowedUsers,
@@ -923,6 +1042,20 @@ async function main() {
     const discord = createDiscordChannel(config);
     router.addChannel(discord);
     console.log("Discord channel configured");
+  }
+
+  // Add Matrix channel
+  if (options.matrixAccessToken && options.matrixHomeserver && options.matrixUserId) {
+    const config: MatrixConfig = {
+      homeserverUrl: options.matrixHomeserver,
+      accessToken: options.matrixAccessToken,
+      userId: options.matrixUserId,
+      allowedRooms: options.matrixAllowedRooms,
+    };
+
+    const matrix = createMatrixChannel(config);
+    router.addChannel(matrix);
+    console.log("Matrix channel configured");
   }
 
   // Start all channels

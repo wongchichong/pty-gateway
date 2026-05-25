@@ -69,6 +69,12 @@ export interface Channel {
   editMessage?(chatId: string, messageId: string, text: string, options?: SendMessageOptions): Promise<boolean>;
   /** Delete a message */
   deleteMessage?(chatId: string, messageId: string): Promise<boolean>;
+  /** Send a reaction to a message (emoji) */
+  sendReaction?(chatId: string, messageId: string, reaction: string): Promise<boolean>;
+  /** Show typing indicator */
+  sendTyping?(chatId: string, durationMs?: number): Promise<void>;
+  /** Stop typing indicator */
+  stopTyping?(chatId: string): Promise<void>;
   /** Set message handler */
   onMessage(handler: MessageHandler): void;
 }

@@ -92,7 +92,17 @@ export class SignalChannel implements Channel {
     _options?: SendMessageOptions
   ): Promise<string> {
     const signalCliPath = this.config.signalCliPath || "signal-cli";
-    
+
+    // Validate chatId format (phone number or UUID)
+    // Phone numbers: optional + prefix, 10-15 digits
+    // UUIDs: standard UUID format for Signal
+    const isPhoneValid = /^\+?\d{10,15}$/.test(chatId);
+    const isUuidValid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(chatId);
+
+    if (!isPhoneValid && !isUuidValid) {
+      throw new Error("Invalid chatId format: must be a phone number (+digits, 10-15 digits) or UUID");
+    }
+
     // Use signal-cli send command
     const args = [
       "-u", this.config.phoneNumber,

@@ -19,7 +19,6 @@ Production readiness remediation for PTY Gateway — a multi-platform messaging 
 - [ ] Remove all hardcoded secrets from configuration files
 - [ ] Fix ID counter persistence bug (base36 → decimal)
 - [ ] Add memory cleanup to prevent unbounded map growth
-- [ ] Add rate limiting to prevent DoS abuse
 - [ ] Add input validation for PTY commands
 - [ ] Fix test architecture (single session tests)
 - [ ] Add auto-refresh timer cleanup on errors
@@ -34,7 +33,7 @@ Production readiness remediation for PTY Gateway — a multi-platform messaging 
 - Multi-instance deployment — out of scope for single-server deployment
 - Database-backed message persistence — current file-based approach sufficient for initial production
 - Health dashboard UI — monitoring scripts provide sufficient visibility
-- Performance optimization beyond memory/rate limiting — current performance acceptable
+- Performance optimization beyond memory cleanup — current performance acceptable
 
 ## Context
 
@@ -50,9 +49,8 @@ Production readiness remediation for PTY Gateway — a multi-platform messaging 
 2. **Reliability**: ID counter bug causes collisions after restart
 3. **Reliability**: Memory leaks from unbounded maps
 4. **Reliability**: Zombie auto-refresh timers on errors
-5. **Security**: No rate limiting (DoS vulnerability)
-6. **Security**: No input validation (command injection risk)
-7. **Testing**: Test suite doesn't maintain session state
+5. **Security**: No input validation (command injection risk)
+6. **Testing**: Test suite doesn't maintain session state
 
 **Architecture:**
 - TypeScript with strict mode enabled
@@ -76,7 +74,6 @@ Production readiness remediation for PTY Gateway — a multi-platform messaging 
 | Environment variables for secrets | Avoids hardcoded credentials, works with PM2/systemd, no external dependencies | — Pending |
 | Decimal ID parsing (not base36) | Numeric IDs are decimal, base36 parsing causes collisions | — Pending |
 | Memory cleanup on session end | Prevents unbounded map growth, avoids OOM crashes | — Pending |
-| Rate limiting: 5 commands/minute | Reasonable user limit, prevents abuse | — Pending |
 | Command whitelist approach | Safer than sanitization, explicit allowed commands | — Pending |
 | Single session test architecture | Matches actual usage, fixes test failures | — Pending |
 

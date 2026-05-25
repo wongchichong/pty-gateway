@@ -311,8 +311,7 @@ if (cols < 20 || cols > 200) {
 
 ### ⚠️ Potential Issues
 
-1. **No Rate Limiting**: Could be abused with rapid commands
-2. **No Input Sanitization**: PTY commands not validated
+1. **No Input Sanitization**: PTY commands not validated
 ```typescript
 await this.pty.send(session.instanceId, msg.text + "\n");  // Direct send
 ```
@@ -380,8 +379,7 @@ if (!ALLOWED_COMMANDS.includes(cmd)) {
 ### Medium Priority
 5. **Add async fs operations** (non-blocking)
 6. **Add resize on connect** (optional feature)
-7. **Add rate limiting** (prevent abuse)
-8. **Add command sanitization** (security)
+7. **Add command sanitization** (security)
 
 ### Low Priority
 9. **Extract constants** (maintainability)

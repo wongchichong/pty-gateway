@@ -134,10 +134,10 @@ export ALLOWED_COMMANDS="ls,pwd,cat,vim,bash,htop,python"
 
 ## Next Steps
 
-**Phase 1 Complete!** All security fixes implemented:
+**Phase 1 Complete!** Most security fixes implemented:
 - ✅ Plan 01-01: Remove hardcoded token from ecosystem.config.js
 - ✅ Plan 01-02: Remove hardcoded token from pty-gateway.service
-- ✅ Plan 01-03: Add rate limiting middleware
+- ⚠️  Plan 01-03: Add rate limiting (REMOVED - personal use)
 - ✅ Plan 01-04: Add command input validation
 
 **Next Phase:**

@@ -17,7 +17,7 @@ The test architecture is already properly implemented with session persistence:
 ### Test Structure
 - 23 tests passing (100% pass rate)
 - Tests properly isolated with beforeEach/afterEach hooks
-- Mock implementations for PTY, Telegram, Discord, and rate limiter
+- Mock implementations for PTY, Telegram, Discord
 
 ## Files Modified
 
@@ -31,7 +31,6 @@ Current coverage: 50% (target: 80%)
 The test suite covers:
 - ✅ Command routing (/start, /list, /kill, /connect, etc.)
 - ✅ Session management
-- ✅ Rate limiting
 - ✅ Message handling
 - ✅ PTY interactions
 

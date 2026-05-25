@@ -244,8 +244,6 @@ Required:
 Optional:
 - `PTY_URL` - PTY server URL (default: http://localhost:3000)
 - `TELEGRAM_ALLOWED_CHATS` - Comma-separated chat IDs
-- `RATE_LIMIT_TOKENS` - Commands per minute per user (default: 5)
-- `RATE_LIMIT_INTERVAL` - Rate limit interval: "minute" or "second" (default: "minute")
 - `AUTO_RESTART` - Enable auto-restart in monitor (true/false)
 - `LOG_LEVEL` - Logging level (info/debug/error)
 - `AUTO_SNAPSHOT_DELAY` - Delay before auto-snapshot in ms (default: 500)
@@ -258,16 +256,10 @@ Optional:
 **Personal Use Setup:**
 This gateway is configured for personal communication use with no command restrictions.
 
-**Rate Limiting:**
-- Default: 5 commands per minute per user
-- Adjust via `RATE_LIMIT_TOKENS` environment variable
-- Prevents spam and API abuse
-
 **No Command Whitelist:**
 All commands are allowed in PTY sessions. Security relies on:
 - PTY service isolation
 - User trust (personal use)
-- Rate limiting protection
 
 ## Support
 

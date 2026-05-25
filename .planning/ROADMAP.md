@@ -12,14 +12,14 @@ Production readiness remediation for PTY Gateway. Each phase addresses a critica
 
 **Goal**: Eliminate all security vulnerabilities blocking production deployment
 
-**Requirements**: SEC-01, SEC-02, SEC-03, SEC-04
+**Requirements**: SEC-01, SEC-02, SEC-03 (removed), SEC-04
 
 **Duration**: 3-5 days
 
 ### Success Criteria
 
 1. ✅ No hardcoded secrets in any configuration file (grep search returns zero results)
-2. ✅ Rate limiting active and verified (test with rapid commands shows blocking)
+2. ⚠️  Rate limiting removed (not needed for personal use)
 3. ✅ Command validation active and verified (blocked command returns "not allowed")
 4. ✅ Environment variable setup documented in OPERATIONS.md
 
@@ -35,12 +35,9 @@ Production readiness remediation for PTY Gateway. Each phase addresses a critica
 - Remove hardcoded value from service file
 - Test systemd deployment with env vars
 
-**SEC-03: Add rate limiting**
-- Install `limiter` package
-- Create rate limiter middleware: 5 commands/minute per user
-- Apply to all channel message handlers
-- Add rate limit logging
-- Test with rapid command spam
+**SEC-03: Add rate limiting (REMOVED - not needed for personal use)**
+- Removed from requirements
+- Feature not implemented
 
 **SEC-04: Add command validation**
 - Create command whitelist array
@@ -56,7 +53,7 @@ Production readiness remediation for PTY Gateway. Each phase addresses a critica
 ### Risks
 
 - **Low**: Environment variable setup may confuse users → Mitigate with clear documentation
-- **Low**: Rate limiting may frustrate legitimate users → Mitigate with reasonable limit (5/min)
+- **Low**: Command validation may block valid commands → Mitigate with configurable whitelist
 
 ---
 
@@ -131,7 +128,7 @@ Production readiness remediation for PTY Gateway. Each phase addresses a critica
 
 1. ✅ All 30 tests pass (100% pass rate, zero failures)
 2. ✅ Integration tests cover key workflows (Connect→Snapshot→Send, Start→Auto-refresh→Kill)
-3. ✅ Error scenarios tested (network failures, invalid inputs, rate limiting)
+3. ✅ Error scenarios tested (network failures, invalid inputs, command validation)
 4. ✅ Test coverage > 80% (measured with vitest coverage)
 
 ### Tasks
@@ -151,7 +148,6 @@ Production readiness remediation for PTY Gateway. Each phase addresses a critica
 **TEST-03: Add error scenario tests**
 - Add test: PTY service unavailable (network failure)
 - Add test: Malformed commands (invalid input)
-- Add test: Rate limit exceeded (rapid commands)
 - Add test: Blocked command (command validation)
 - Run error tests, verify proper error handling
 
@@ -262,7 +258,6 @@ Phase 4: Operations Updates (2-3 days)
 | ID counter fix affects existing instances | Phase 2 | Medium | Test migration with existing instances |
 | Test architecture changes complex | Phase 3 | Medium | Incremental approach, test each change |
 | Environment variable setup confusion | Phase 1 | Low | Clear documentation with examples |
-| Rate limiting frustrates users | Phase 1 | Low | Reasonable limit (5/min), clear error message |
 | Async fs race conditions | Phase 2 | Low | Proper error handling, testing |
 | Documentation incomplete | Phase 4 | Low | Checklist review, peer review |
 | Alerting webhook setup complexity | Phase 4 | Low | Clear instructions, test webhook |
