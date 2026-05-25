@@ -471,12 +471,7 @@ export class Router {
       // Subscribe to PTY output
       this.pty.subscribe(instance.id);
 
-      await channel.sendMessage(
-        msg.chatId,
-        `Started PTY: ${shortId}\nCommand: ${command} ${cmdArgs.join(" ")}\nPID: ${instance.pid}`
-      );
-
-      // Send initial snapshot and start auto-refresh
+      // Send snapshot - skip status message
       await this.sendSnapshot(instance.id, msg.chatId, channel);
       this.startAutoRefresh(sessionKey, instance.id, msg.chatId, channel);
     } catch (err) {

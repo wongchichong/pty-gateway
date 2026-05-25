@@ -6,6 +6,7 @@ import type {
   SendMessageOptions,
 } from "./types.js";
 import { spawn } from "child_process";
+import type { ChildProcess } from "child_process";
 
 export interface IMessageConfig {
   /** AppleScript path (default: osascript) */

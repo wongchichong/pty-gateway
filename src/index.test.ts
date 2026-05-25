@@ -234,7 +234,8 @@ describe("Router", () => {
       cols: 40,
       rows: 80,
     });
-    expect(messages[0]).toContain("Started PTY");
+    // Snapshot is sent instead of status message
+    expect(messages[0]).toContain("test output");
   });
 
   it("handles /list command", async () => {
